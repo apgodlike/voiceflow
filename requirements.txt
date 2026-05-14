@@ -1,0 +1,11 @@
+sounddevice
+soundfile
+numpy
+openai
+pynput
+pyperclip
+pyautogui
+pystray
+Pillow
+python-dotenv
+pytest
