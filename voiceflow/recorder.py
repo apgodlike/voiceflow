@@ -1,4 +1,4 @@
-"""Chunked WAV recorder — writes to disk continuously during recording."""
+"""Chunked OGG recorder — writes to disk continuously during recording."""
 import argparse
 import time
 from pathlib import Path
@@ -19,15 +19,18 @@ _active: dict[str, dict] = {}
 def start_recording() -> str:
     RECORDINGS_DIR.mkdir(parents=True, exist_ok=True)
     recording_id = uuid4().hex
-    wav_path = RECORDINGS_DIR / f"{recording_id}.wav"
-    sf_file = sf.SoundFile(wav_path, mode="w", samplerate=SAMPLE_RATE, channels=CHANNELS, subtype="PCM_16")
+    audio_path = RECORDINGS_DIR / f"{recording_id}.ogg"
+    sf_file = sf.SoundFile(
+        audio_path, mode="w", samplerate=SAMPLE_RATE, channels=CHANNELS,
+        format="OGG", subtype="VORBIS",
+    )
 
     def callback(indata: np.ndarray, frames: int, time_info, status) -> None:
         sf_file.write(indata)
 
     stream = sd.InputStream(samplerate=SAMPLE_RATE, channels=CHANNELS, dtype=DTYPE, callback=callback)
     stream.start()
-    _active[recording_id] = {"stream": stream, "file": sf_file, "path": wav_path}
+    _active[recording_id] = {"stream": stream, "file": sf_file, "path": audio_path}
     return recording_id
 
 
@@ -50,5 +53,5 @@ if __name__ == "__main__":
         path = stop_recording(rid)
         size = path.stat().st_size
         print(f"Saved: {path} ({size} bytes)")
-        assert size > 0, "WAV file empty"
+        assert size > 0, "audio file empty"
         print("PASS")

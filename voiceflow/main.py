@@ -1,5 +1,6 @@
 """VoiceFlow entry point — wires all modules together."""
 import logging
+import os
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -23,11 +24,11 @@ _queue_module = q
 _executor: ThreadPoolExecutor | None = None
 
 
-def _process_job(rid: str, wav_path: Path) -> None:
+def _process_job(rid: str, audio_path: Path) -> None:
     assert _tray is not None
     _tray.set_state("transcribing")
     try:
-        raw = transcriber.transcribe(wav_path)
+        raw = transcriber.transcribe(audio_path)
         cleaned = cleaner.clean(raw)
         paster.paste(cleaned)
         _queue_module.mark_success(rid, raw, cleaned)
@@ -55,11 +56,11 @@ def _on_stop() -> None:
     if rid is None:
         return
     _current_rid = None
-    wav = recorder.stop_recording(rid)
-    logger.info("Recording stopped: %s → %s", rid, wav)
-    _queue_module.enqueue(rid, wav)
+    audio = recorder.stop_recording(rid)
+    logger.info("Recording stopped: %s → %s", rid, audio)
+    _queue_module.enqueue(rid, audio)
     if _executor:
-        _executor.submit(_process_job, rid, wav)
+        _executor.submit(_process_job, rid, audio)
     if _tray:
         _tray.set_state("idle")
 
@@ -71,25 +72,24 @@ def _sweeper() -> None:
             if _shutdown.is_set():
                 break
             logger.info("Sweeper retrying: %s (attempt %d)", job.recording_id, job.attempts + 1)
-            wav = Path(job.wav_path)
-            if wav.exists() and _executor:
-                _executor.submit(_process_job, job.recording_id, wav)
+            audio = Path(job.wav_path)
+            if audio.exists() and _executor:
+                _executor.submit(_process_job, job.recording_id, audio)
         _shutdown.wait(60)
 
 
 def main() -> None:
     global _tray, _executor
 
-    _tray = Tray()
+    _tray = Tray(on_quit=_shutdown.set)
     _executor = ThreadPoolExecutor(max_workers=2)
 
-    # Initial sweep — recover jobs from prior crash
     pending = list(_queue_module.retry_all())
     for job in pending:
-        wav = Path(job.wav_path)
-        if wav.exists():
+        audio = Path(job.wav_path)
+        if audio.exists():
             logger.info("Startup sweep: retrying %s", job.recording_id)
-            _executor.submit(_process_job, job.recording_id, wav)
+            _executor.submit(_process_job, job.recording_id, audio)
 
     sweeper = threading.Thread(target=_sweeper, daemon=True, name="sweeper")
     sweeper.start()
@@ -98,13 +98,21 @@ def main() -> None:
     hotkey.start()
     logger.info("VoiceFlow ready. Hold Ctrl+Alt to record, or double-tap to toggle.")
 
+    # run_detached() puts pystray's Win32 message pump on a daemon thread,
+    # freeing the main thread to run Python code that responds to Ctrl+C.
+    _tray.run_detached()
     try:
-        _tray.run()  # blocks on main thread
+        while not _shutdown.is_set():
+            time.sleep(0.2)
+    except KeyboardInterrupt:
+        pass
     finally:
         _shutdown.set()
+        _tray.stop()
         hotkey.stop()
         _executor.shutdown(wait=False)
         logger.info("VoiceFlow shut down.")
+        os._exit(0)  # ThreadPoolExecutor threads are non-daemon; force exit
 
 
 if __name__ == "__main__":

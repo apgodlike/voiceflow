@@ -43,11 +43,12 @@ def _last_10_history(db_path: Path = _DB_PATH) -> list[tuple[str, str]]:
 
 
 class Tray:
-    def __init__(self, db_path: Path = _DB_PATH) -> None:
+    def __init__(self, db_path: Path = _DB_PATH, on_quit=None) -> None:
         self._state: Literal["idle", "recording", "transcribing"] = "idle"
         self._failed_count = 0
         self._db_path = db_path
         self._lock = threading.Lock()
+        self._on_quit_cb = on_quit
         self._icon = pystray.Icon(
             "VoiceFlow",
             _make_icon(_ICON_COLORS["idle"]),
@@ -61,14 +62,20 @@ class Tray:
         with self._lock:
             self._state = state
         color = _ICON_COLORS.get(state, _ICON_COLORS["idle"])
-        self._icon.icon = _make_icon(color)
-        self._icon.title = f"VoiceFlow — {state}"
+        try:
+            self._icon.icon = _make_icon(color)
+            self._icon.title = f"VoiceFlow — {state}"
+        except OSError:
+            pass
 
     def set_failed_count(self, n: int) -> None:
         with self._lock:
             self._failed_count = n
         if n > 0:
-            self._icon.icon = _make_icon(_ICON_COLORS["failed"])
+            try:
+                self._icon.icon = _make_icon(_ICON_COLORS["failed"])
+            except OSError:
+                pass
 
     def notify(self, title: str, message: str) -> None:
         try:
@@ -78,6 +85,9 @@ class Tray:
 
     def run(self) -> None:
         self._icon.run()
+
+    def run_detached(self) -> None:
+        self._icon.run_detached()
 
     def stop(self) -> None:
         self._icon.stop()
@@ -123,6 +133,8 @@ class Tray:
         pass  # main.py sweeper handles retries; menu entry is informational trigger
 
     def _on_quit(self, icon, item) -> None:
+        if self._on_quit_cb:
+            self._on_quit_cb()
         self._icon.stop()
 
 

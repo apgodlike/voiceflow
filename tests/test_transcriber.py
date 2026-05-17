@@ -23,7 +23,7 @@ def test_returns_stripped_text(tmp_path):
     assert result == "hello world"
     mock_client.audio.transcriptions.create.assert_called_once()
     call_kwargs = mock_client.audio.transcriptions.create.call_args.kwargs
-    assert call_kwargs["model"] == "whisper-1"
+    assert call_kwargs["model"] == "gpt-4o-mini-transcribe"
     assert call_kwargs["timeout"] == 30
 
 
@@ -38,5 +38,5 @@ def test_raises_transcription_error_on_api_failure(tmp_path):
         with pytest.raises(TranscriptionError) as exc_info:
             transcribe(wav)
 
-    assert "Whisper call failed" in str(exc_info.value)
+    assert "Transcription call failed" in str(exc_info.value)
     assert exc_info.value.__cause__ is not None
