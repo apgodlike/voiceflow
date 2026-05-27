@@ -25,6 +25,7 @@ DEFAULTS: dict[str, Any] = {
     "code_mode": False,        # skip auto-capitalize + auto-period (dictating code)
     "raw_mode": False,         # deliver verbatim transcript, bypass the cleaner
     "preserve_clipboard": False,  # restore prior clipboard after paste (verify timing)
+    "max_recording_sec": 600,  # auto-stop a runaway recording at 10 min (0 = no cap)
 }
 
 

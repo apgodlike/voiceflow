@@ -38,3 +38,7 @@ def test_resolved_model_falls_back_to_default():
     with patch.dict("os.environ", {}, clear=True):
         assert config.resolved_model({}) == config.DEFAULTS["model"]
         assert config.resolved_model({"model": "gpt-4o-transcribe"}) == "gpt-4o-transcribe"
+
+
+def test_max_recording_cap_default_is_ten_minutes():
+    assert config.DEFAULTS["max_recording_sec"] == 600

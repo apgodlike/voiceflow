@@ -51,6 +51,7 @@ class App:
     def __init__(self) -> None:
         self._shutdown = threading.Event()
         self._current_rid: str | None = None
+        self._max_timer: threading.Timer | None = None
         self._cfg = config.load()
         self._apply_config_env()
         self._executor = ThreadPoolExecutor(max_workers=MAX_WORKERS)
@@ -171,6 +172,29 @@ class App:
         for p in seg_paths.values():
             Path(p).unlink(missing_ok=True)
 
+    def _start_max_timer(self) -> None:
+        self._cancel_max_timer()
+        secs = self._cfg.get("max_recording_sec", 600)
+        if secs and secs > 0:
+            self._max_timer = threading.Timer(secs, self._auto_stop)
+            self._max_timer.daemon = True
+            self._max_timer.start()
+
+    def _cancel_max_timer(self) -> None:
+        if self._max_timer is not None:
+            self._max_timer.cancel()
+            self._max_timer = None
+
+    def _auto_stop(self) -> None:
+        """Fired by the duration timer — stop a runaway recording and tell the
+        user so they can start a fresh one."""
+        if self._current_rid is None:
+            return
+        secs = self._cfg.get("max_recording_sec", 600)
+        logger.info("Max recording duration (%ss) reached — auto-stopping", secs)
+        self._ui.toast(f"Recording stopped — {secs // 60} min limit. Start again to continue.")
+        self._on_stop()
+
     def _on_start(self) -> None:
         with self._seg_lock:
             self._seg_futures = {}
@@ -178,11 +202,13 @@ class App:
         self._current_rid = recorder.start_recording(on_segment=self._on_segment)
         logger.info("Recording started: %s", self._current_rid)
         self._set_state("recording")
+        self._start_max_timer()
 
     def _on_stop(self) -> None:
         rid = self._current_rid
         if rid is None:
             return
+        self._cancel_max_timer()
         self._current_rid = None
         full = recorder.stop_recording(rid)  # fires on_segment for the final segment
         logger.info("Recording stopped: %s", rid)
@@ -239,6 +265,7 @@ class App:
 
     def shutdown(self) -> None:
         self._shutdown.set()
+        self._cancel_max_timer()
         self._tray.stop()
         self._hotkey.stop()
         self._executor.shutdown(wait=False, cancel_futures=True)
