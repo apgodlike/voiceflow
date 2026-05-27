@@ -8,9 +8,16 @@ Resolution order:
 3. ``<repo>/data`` fallback for non-Windows dev / CI where LOCALAPPDATA is unset.
 """
 import os
+import sys
 from pathlib import Path
 
 _APP_NAME = "VoiceFlow"
+
+
+def asset_path(name: str) -> Path:
+    """Resolve a bundled asset in dev and in a PyInstaller bundle."""
+    base = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent.parent))
+    return base / "assets" / name
 
 
 def _base_dir() -> Path:

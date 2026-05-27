@@ -148,6 +148,31 @@ Run a single module's tests:
 pytest tests/test_cleaner.py -v
 ```
 
+## Building the Windows installer
+
+Produces a standalone app that needs no Python on the target machine.
+
+```powershell
+cd voiceflow
+venv\Scripts\activate
+pip install -r requirements-dev.txt
+
+python tools\make_icon.py            # regenerate assets\icon.ico (optional)
+pyinstaller VoiceFlow.spec --noconfirm   # → dist\VoiceFlow\VoiceFlow.exe (onedir)
+```
+
+The PyInstaller build bundles the PortAudio and libsndfile native DLLs explicitly
+(they are not plain Python imports). **Always test `dist\VoiceFlow\VoiceFlow.exe`
+on a machine with no Python installed** — a missing native DLL only shows up there.
+
+To wrap it as `VoiceFlow-Setup.exe`, install [Inno Setup](https://jrsoftware.org/isdl.php)
+and compile `installer.iss` (open in the IDE and press F9, or run `ISCC installer.iss`).
+The installer does a per-user install (no admin), adds a Start Menu shortcut, an
+optional "start on login" entry, and launches the app on finish.
+
+> Unsigned builds trigger a Windows SmartScreen warning ("Windows protected your
+> PC"). Click **More info → Run anyway**. Code signing would remove this.
+
 ## Architecture
 
 ```

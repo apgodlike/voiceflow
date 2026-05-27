@@ -7,9 +7,14 @@ event loops do not fight.
 
 No method here makes a sound — toasts are silent by design.
 """
+import logging
 import tkinter as tk
 from tkinter import ttk
 from typing import Any, Callable
+
+from voiceflow import paths
+
+logger = logging.getLogger("voiceflow.ui")
 
 _COLORS = {"recording": "#e03030", "transcribing": "#e0a000", "idle": "#808080"}
 _MODELS = ["gpt-4o-mini-transcribe", "gpt-4o-transcribe"]
@@ -38,6 +43,10 @@ class UI:
         self.root.geometry("420x300")
         self.root.resizable(False, False)
         self.root.protocol("WM_DELETE_WINDOW", self.hide)  # close → tray, not quit
+        try:
+            self.root.iconbitmap(str(paths.asset_path("icon.ico")))
+        except tk.TclError:
+            logger.debug("Window icon not set (icon.ico missing)")
 
         self._overlay: tk.Toplevel | None = None
         self._toast: tk.Toplevel | None = None
