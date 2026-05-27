@@ -38,7 +38,7 @@ def transcribe(audio_path: Path) -> str:
                 timeout=30,
             )
         elapsed = time.monotonic() - t0
-        logger.info("Transcription done in %.2fs: %r", elapsed, response.text[:80])
+        logger.info("Transcription done in %.2fs (%d chars)", elapsed, len(response.text))
         return response.text.strip()
     except AuthenticationError as exc:
         raise TranscriptionError(f"Auth failed — check OPENAI_API_KEY: {exc}") from exc

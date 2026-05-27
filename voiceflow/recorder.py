@@ -8,10 +8,12 @@ import numpy as np
 import sounddevice as sd
 import soundfile as sf
 
+from voiceflow import paths
+
 SAMPLE_RATE = 16000
 CHANNELS = 1
 DTYPE = "int16"
-RECORDINGS_DIR = Path(__file__).parent.parent / "data" / "recordings"
+RECORDINGS_DIR = paths.RECORDINGS_DIR
 
 _active: dict[str, dict] = {}
 

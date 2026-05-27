@@ -22,10 +22,6 @@ def paste(text: str) -> bool:
         return False
 
 
-def copy_only(text: str) -> None:
-    pyperclip.copy(text)
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("text")

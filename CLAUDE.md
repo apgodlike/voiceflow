@@ -33,7 +33,7 @@ python -m voiceflow.paster "hello world"       # sleeps 3 s then pastes
 python -m voiceflow.queue --list
 python -m voiceflow.hotkey --test              # interactive, Ctrl+C to exit
 python -m voiceflow.tray --test               # cycles icon states
-python -m voiceflow.transcriber path/to/file.wav  # needs OPENAI_API_KEY
+python -m voiceflow.transcriber path/to/file.ogg  # needs OPENAI_API_KEY
 ```
 
 ## Architecture
@@ -46,7 +46,7 @@ hotkey.py → recorder.py → queue.py → transcriber.py → cleaner.py → pas
 
 **Key design constraints:**
 
-1. **Audio written to disk during recording** — `recorder.py` uses `soundfile.SoundFile` in write mode and flushes each chunk in the `sounddevice` callback. Whisper is called only after `stop_recording()` closes the file. Do not buffer audio in memory.
+1. **Audio written to disk during recording** — `recorder.py` uses `soundfile.SoundFile` in write mode (OGG/Vorbis) and flushes each chunk in the `sounddevice` callback. Transcription is called only after `stop_recording()` closes the file. Do not buffer audio in memory.
 
 2. **No retry logic in `transcriber.py`** — it raises `TranscriptionError` on any failure. Retries are owned entirely by `queue.py` + the sweeper in `main.py`.
 
@@ -54,7 +54,7 @@ hotkey.py → recorder.py → queue.py → transcriber.py → cleaner.py → pas
 
 4. **Queue files are atomic** — `queue.py` writes to `.tmp` then `os.replace()`. Never write queue JSON directly to the target path.
 
-5. **SQLite is opened per-call** — each `mark_success` opens and closes its own connection to avoid `check_same_thread` issues across the executor threads.
+5. **No transcript persistence (privacy)** — `mark_success` deletes the audio file and the queue entry; nothing is stored. Audio survives only on failure, so a job can be retried. Never log dictated content — logs carry metadata only.
 
 ## Hotkey State Machine
 
@@ -83,10 +83,15 @@ States: `IDLE → RECORDING_HOLD → IDLE` (hold path) or `IDLE → RECORDING_TO
 
 ## Data Paths
 
-All data paths are relative to `voiceflow/data/` (resolved from `__file__` in each module — not from cwd). Running modules from any working directory works correctly.
+All data paths resolve through `paths.py` (single source of truth). Base dir is
+`VOICEFLOW_DATA_DIR` → `%LOCALAPPDATA%\VoiceFlow` → `<repo>/data` fallback. Modules
+import `paths` rather than computing `__file__`-relative paths. This keeps the app
+working when installed to read-only Program Files and when frozen by PyInstaller.
 
 ## Environment
 
 - `OPENAI_API_KEY` — required for transcription
 - `VOICEFLOW_HOTKEY` — optional, default `ctrl+alt`
+- `VOICEFLOW_MODEL` — optional, default `gpt-4o-mini-transcribe`
+- `VOICEFLOW_DATA_DIR` — optional, overrides the data base dir
 - `python-dotenv` loads `.env` in `main.py` at startup; other modules read from `os.environ` directly via the OpenAI SDK's default key lookup

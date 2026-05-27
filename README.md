@@ -1,6 +1,6 @@
 # VoiceFlow
 
-Windows desktop voice-to-text app. Hold or double-tap **Left Ctrl + Left Alt** → mic records → OpenAI Whisper transcribes → filler words stripped → cleaned text auto-pasted at cursor via clipboard + Ctrl+V.
+Windows desktop voice-to-text app. Hold or double-tap **Left Ctrl + Left Alt** → mic records → OpenAI transcription → filler words stripped → cleaned text auto-pasted at cursor via clipboard + Ctrl+V.
 
 ## Quick Start
 
@@ -36,10 +36,10 @@ Two activation modes, both bound to **Left Ctrl + Left Alt**:
 ```
 mic audio
   │
-  ▼  (16 kHz mono int16, chunked to disk during recording)
-data/recordings/{uuid}.wav
+  ▼  (16 kHz mono OGG/Vorbis, chunked to disk during recording)
+recordings/{uuid}.ogg
   │
-  ▼  (OpenAI Whisper API, 30 s timeout)
+  ▼  (OpenAI transcription API, 30 s timeout)
 raw transcript
   │
   ▼  (regex filler strip)
@@ -49,7 +49,7 @@ cleaned text
 cursor
 ```
 
-If Whisper fails → job saved to `data/queue/{uuid}.json` → background sweeper retries every 60 s, max 3 attempts. Manual retry available from tray menu.
+On success the audio file is deleted immediately — no transcript is stored. If transcription fails → job saved to `queue/{uuid}.json` and the audio is kept → background sweeper retries every 60 s, max 3 attempts. Manual retry available from the tray menu.
 
 ## Filler Words Stripped
 
@@ -74,24 +74,31 @@ Tray menu: Status · History (last 10 transcriptions) · Retry Failed · Quit.
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `OPENAI_API_KEY` | Yes | — | OpenAI API key for Whisper |
+| `OPENAI_API_KEY` | Yes | — | OpenAI API key for transcription |
 | `VOICEFLOW_HOTKEY` | No | `ctrl+alt` | Hotkey combo |
+| `VOICEFLOW_MODEL` | No | `gpt-4o-mini-transcribe` | Transcription model. Set to `gpt-4o-transcribe` for higher accuracy at ~2× cost |
+| `VOICEFLOW_DATA_DIR` | No | `%LOCALAPPDATA%\VoiceFlow` | Override where recordings/queue/logs are written |
 
 ## Data Layout
 
+All data lives under `%LOCALAPPDATA%\VoiceFlow\` (override with `VOICEFLOW_DATA_DIR`):
+
 ```
-voiceflow/
-└── data/
-    ├── recordings/    WAV files (16 kHz mono int16)
-    ├── queue/         Pending/failed jobs as {uuid}.json
-    └── history.sqlite Successful transcription history
+%LOCALAPPDATA%\VoiceFlow\
+├── recordings/     OGG/Vorbis audio (16 kHz mono), deleted after a successful paste
+├── queue/          Pending/failed jobs as {uuid}.json
+└── voiceflow.log   Rotating log — metadata only, never transcript content
 ```
+
+**Privacy:** no transcript text is ever persisted. Audio is kept only long enough
+to transcribe and paste, then deleted; it survives only when a job fails, so it can
+be retried. Logs record timing/counts, never what you dictated.
 
 Queue JSON schema:
 ```json
 {
   "recording_id": "hex-uuid",
-  "wav_path": "data/recordings/....wav",
+  "audio_path": "...\\recordings\\....ogg",
   "status": "pending|failed",
   "attempts": 0,
   "last_error": "",
@@ -99,19 +106,18 @@ Queue JSON schema:
 }
 ```
 
-History table: `id`, `raw_text`, `cleaned_text`, `wav_path`, `created_at`.
-
 ## Module Reference
 
 Each module is independently runnable via `python -m voiceflow.<module> --test`.
 
 | Module | Purpose | CLI smoke test |
 |--------|---------|----------------|
-| `recorder.py` | Chunked WAV write via sounddevice + soundfile | Records 3 s, prints path + size |
-| `transcriber.py` | OpenAI Whisper API call | `python -m voiceflow.transcriber path/to/file.wav` |
+| `recorder.py` | Chunked OGG/Vorbis write via sounddevice + soundfile | Records 3 s, prints path + size |
+| `transcriber.py` | OpenAI transcription API call | `python -m voiceflow.transcriber path/to/file.ogg` |
 | `cleaner.py` | Regex filler strip + text normalization | `python -m voiceflow.cleaner "um so basically hello"` |
 | `paster.py` | pyperclip copy + pyautogui Ctrl+V | Sleeps 3 s then pastes "hello world" |
-| `queue.py` | Disk-backed JSON queue + sqlite history | `python -m voiceflow.queue --list` / `--retry-all` |
+| `queue.py` | Disk-backed JSON retry queue | `python -m voiceflow.queue --list` / `--retry-all` |
+| `paths.py` | Central data-dir resolution (`%LOCALAPPDATA%`) | — |
 | `hotkey.py` | pynput hold/double-tap state machine | Prints START/STOP events interactively |
 | `tray.py` | pystray icon + dynamic menu | Cycles icon states every 2 s |
 | `main.py` | Orchestration + 60 s background sweeper | `python -m voiceflow.main` |
@@ -124,7 +130,7 @@ venv\Scripts\activate
 pytest
 ```
 
-37 tests across 5 modules (`test_recorder`, `test_transcriber`, `test_cleaner`, `test_paster`, `test_queue`, `test_hotkey`). All modules monkeypatched — no network calls, no mic access required.
+37 tests across 6 modules (`test_recorder`, `test_transcriber`, `test_cleaner`, `test_paster`, `test_queue`, `test_hotkey`). All modules monkeypatched — no network calls, no mic access required.
 
 Run a single module's tests:
 ```powershell
@@ -137,13 +143,13 @@ pytest tests/test_cleaner.py -v
 keyboard ──── hotkey.py ─── on_start / on_stop callbacks
                   │
                   ▼
-            recorder.py ──────────────── data/recordings/{uuid}.wav
+            recorder.py ──────────────── recordings/{uuid}.ogg
                   │                              │
                   ▼                              │
             queue.py ◄─── enqueue ──────────────┘
                   │  (worker thread pulls job)
                   ▼
-          transcriber.py ── OpenAI Whisper API
+          transcriber.py ── OpenAI transcription API
                   │
                   ▼
             cleaner.py ── regex filler strip
@@ -152,15 +158,15 @@ keyboard ──── hotkey.py ─── on_start / on_stop callbacks
             paster.py ── pyperclip + pyautogui Ctrl+V
                   │
                   ▼  on success
-            queue.py ── mark_success → history.sqlite
+            queue.py ── mark_success → delete audio + queue entry
 
-tray.py  runs on main thread, polls queue + recorder state for icon color
-main.py  wires all modules + runs 60 s background retry sweeper
+main.py    App class wires all modules + runs 60 s background retry sweeper
+tray.py    pystray icon (detached thread), reflects recorder/queue state
 ```
 
 ## Crash Recovery
 
-Audio is written to disk **continuously during recording** via chunked `soundfile.SoundFile` writes. A crash mid-record leaves a usable (partial) WAV. On restart, `main.py` immediately sweeps `data/queue/` and retries any pending jobs (max 3 attempts each).
+Audio is written to disk **continuously during recording** via chunked `soundfile.SoundFile` writes. A crash mid-record leaves a usable (partial) OGG. On restart, `main.py` immediately sweeps the queue dir and retries any pending jobs (max 3 attempts each).
 
 ## Troubleshooting
 
@@ -173,8 +179,8 @@ Some anti-cheat or accessibility tools intercept `pynput`. Try running VoiceFlow
 **`sounddevice` can't open mic**
 Run `python -c "import sounddevice; print(sounddevice.query_devices())"` to list devices. Check Windows mic privacy settings (Settings → Privacy → Microphone).
 
-**Whisper keeps failing**
-Check `OPENAI_API_KEY` in `.env`. Failures land in `data/queue/` and are retried automatically every 60 s.
+**Transcription keeps failing**
+Check `OPENAI_API_KEY` in `.env`. Failures land in the queue dir and are retried automatically every 60 s.
 
 ## Dependencies
 
@@ -182,7 +188,7 @@ Check `OPENAI_API_KEY` in `.env`. Failures land in `data/queue/` and are retried
 sounddevice   # mic capture
 soundfile     # chunked WAV write
 numpy         # audio buffer dtype
-openai        # Whisper API
+openai        # transcription API
 pynput        # global hotkey listener
 pyperclip     # clipboard
 pyautogui     # Ctrl+V simulation
@@ -191,3 +197,7 @@ Pillow        # tray icon image generation
 python-dotenv # .env loading
 pytest        # tests
 ```
+
+## License
+
+MIT — see [LICENSE](LICENSE). Free to use, modify, and distribute.

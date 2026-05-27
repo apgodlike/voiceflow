@@ -1,42 +1,35 @@
-"""Disk-backed retry queue + sqlite history."""
+"""Disk-backed retry queue.
+
+A job's audio file is the source of truth until it is transcribed and pasted
+successfully. On success both the audio and the queue entry are deleted (no
+transcript is persisted — see privacy design). On failure the audio is kept so
+the job can be retried, automatically up to ``MAX_ATTEMPTS`` and then manually.
+"""
 import argparse
 import json
+import logging
 import os
-import sqlite3
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterator
 
-BASE_DIR = Path(__file__).parent.parent / "data"
-QUEUE_DIR = BASE_DIR / "queue"
-DB_PATH = BASE_DIR / "history.sqlite"
+from voiceflow import paths
 
-_SCHEMA = """
-CREATE TABLE IF NOT EXISTS history (
-    id TEXT PRIMARY KEY,
-    raw_text TEXT NOT NULL,
-    cleaned_text TEXT NOT NULL,
-    wav_path TEXT NOT NULL,
-    created_at TEXT NOT NULL
-);
-"""
+logger = logging.getLogger("voiceflow.queue")
+
+QUEUE_DIR = paths.QUEUE_DIR
+MAX_ATTEMPTS = 3
 
 
 @dataclass
 class Job:
     recording_id: str
-    wav_path: str
+    audio_path: str
     status: str = "pending"
     attempts: int = 0
     last_error: str = ""
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
-
-
-def _init_db(db_path: Path = DB_PATH) -> None:
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-    with sqlite3.connect(db_path) as conn:
-        conn.execute(_SCHEMA)
 
 
 def _queue_path(recording_id: str, queue_dir: Path = QUEUE_DIR) -> Path:
@@ -56,8 +49,8 @@ def _read_job(recording_id: str, queue_dir: Path = QUEUE_DIR) -> Job:
     return Job(**data)
 
 
-def enqueue(recording_id: str, wav_path: str | Path, queue_dir: Path = QUEUE_DIR) -> Job:
-    job = Job(recording_id=recording_id, wav_path=str(wav_path))
+def enqueue(recording_id: str, audio_path: str | Path, queue_dir: Path = QUEUE_DIR) -> Job:
+    job = Job(recording_id=recording_id, audio_path=str(audio_path))
     _write_job(job, queue_dir)
     return job
 
@@ -71,21 +64,11 @@ def mark_failed(recording_id: str, error: str, queue_dir: Path = QUEUE_DIR) -> J
     return job
 
 
-def mark_success(
-    recording_id: str,
-    raw: str,
-    cleaned: str,
-    queue_dir: Path = QUEUE_DIR,
-    db_path: Path = DB_PATH,
-) -> None:
+def mark_success(recording_id: str, queue_dir: Path = QUEUE_DIR) -> None:
+    """Delete the audio file and the queue entry — nothing is persisted."""
     job = _read_job(recording_id, queue_dir)
-    _init_db(db_path)
-    with sqlite3.connect(db_path) as conn:
-        conn.execute(
-            "INSERT OR REPLACE INTO history (id, raw_text, cleaned_text, wav_path, created_at) VALUES (?,?,?,?,?)",
-            (job.recording_id, raw, cleaned, job.wav_path, job.created_at),
-        )
-    _queue_path(recording_id, queue_dir).unlink()
+    Path(job.audio_path).unlink(missing_ok=True)
+    _queue_path(recording_id, queue_dir).unlink(missing_ok=True)
 
 
 def list_pending(queue_dir: Path = QUEUE_DIR) -> list[Job]:
@@ -94,16 +77,15 @@ def list_pending(queue_dir: Path = QUEUE_DIR) -> list[Job]:
     jobs = []
     for p in queue_dir.glob("*.json"):
         try:
-            data = json.loads(p.read_text(encoding="utf-8"))
-            jobs.append(Job(**data))
-        except Exception:
-            pass
+            jobs.append(Job(**json.loads(p.read_text(encoding="utf-8"))))
+        except (json.JSONDecodeError, TypeError, OSError) as exc:
+            logger.warning("Skipping unreadable queue file %s: %s", p.name, exc)
     return jobs
 
 
 def retry_all(queue_dir: Path = QUEUE_DIR) -> Iterator[Job]:
     for job in list_pending(queue_dir):
-        if job.attempts < 3:
+        if job.attempts < MAX_ATTEMPTS:
             yield job
 
 

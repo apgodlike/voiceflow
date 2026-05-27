@@ -1,17 +1,11 @@
 """System tray icon + menu using pystray + Pillow."""
 import argparse
-import sqlite3
 import threading
 import time
-from pathlib import Path
 from typing import Literal
 
 from PIL import Image, ImageDraw
 import pystray
-
-from voiceflow import queue as q
-
-_DB_PATH = Path(__file__).parent.parent / "data" / "history.sqlite"
 
 # 16x16 solid-circle icons — generated inline (no external image files)
 _ICON_COLORS: dict[str, str] = {
@@ -29,26 +23,13 @@ def _make_icon(color: str) -> Image.Image:
     return img
 
 
-def _last_10_history(db_path: Path = _DB_PATH) -> list[tuple[str, str]]:
-    if not db_path.exists():
-        return []
-    try:
-        with sqlite3.connect(db_path) as conn:
-            rows = conn.execute(
-                "SELECT id, cleaned_text FROM history ORDER BY created_at DESC LIMIT 10"
-            ).fetchall()
-        return rows
-    except Exception:
-        return []
-
-
 class Tray:
-    def __init__(self, db_path: Path = _DB_PATH, on_quit=None) -> None:
+    def __init__(self, on_quit=None, on_retry=None) -> None:
         self._state: Literal["idle", "recording", "transcribing"] = "idle"
         self._failed_count = 0
-        self._db_path = db_path
         self._lock = threading.Lock()
         self._on_quit_cb = on_quit
+        self._on_retry_cb = on_retry
         self._icon = pystray.Icon(
             "VoiceFlow",
             _make_icon(_ICON_COLORS["idle"]),
@@ -104,24 +85,6 @@ class Tray:
             pystray.Menu.SEPARATOR,
         ]
 
-        history = _last_10_history(self._db_path)
-        if history:
-            items.append(
-                pystray.MenuItem(
-                    "History",
-                    pystray.Menu(
-                        *[
-                            pystray.MenuItem(
-                                f"{text[:40]}{'…' if len(text) > 40 else ''}",
-                                None,
-                                enabled=False,
-                            )
-                            for _, text in history
-                        ]
-                    ),
-                )
-            )
-
         retry_label = f"Retry Failed ({failed})" if failed else "No Failed Jobs"
         items.append(pystray.MenuItem(retry_label, self._on_retry, enabled=failed > 0))
         items.append(pystray.Menu.SEPARATOR)
@@ -130,7 +93,8 @@ class Tray:
         return tuple(items)
 
     def _on_retry(self, icon, item) -> None:
-        pass  # main.py sweeper handles retries; menu entry is informational trigger
+        if self._on_retry_cb:
+            self._on_retry_cb()
 
     def _on_quit(self, icon, item) -> None:
         if self._on_quit_cb:
