@@ -27,6 +27,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.io.File
+import java.io.IOException
 
 /**
  * Foreground service (type microphone) that hosts the floating bubble and runs
@@ -46,6 +48,7 @@ class RecorderService : Service() {
     private lateinit var settings: Settings
 
     @Volatile private var phase = Phase.IDLE
+    @Volatile private var recordStartMs = 0L
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -76,6 +79,7 @@ class RecorderService : Service() {
         }
         try {
             recorder.start()
+            recordStartMs = System.currentTimeMillis()
             phase = Phase.RECORDING
             bubble.setState(OverlayBubble.State.RECORDING)
         } catch (e: Exception) {
@@ -85,20 +89,21 @@ class RecorderService : Service() {
     }
 
     private fun stopAndTranscribe() {
+        val elapsed = System.currentTimeMillis() - recordStartMs
         val file = recorder.stop()
         phase = Phase.TRANSCRIBING
         bubble.setState(OverlayBubble.State.TRANSCRIBING)
 
-        if (file == null || !file.exists() || file.length() == 0L) {
+        if (file == null || !file.exists() || file.length() == 0L || elapsed < MIN_RECORD_MS) {
             file?.delete()
-            toast("Recording too short")
+            toast("Too short — hold a moment while you speak")
             flashError()
             return
         }
 
         scope.launch {
             try {
-                val raw = Transcriber(settings.apiKey, settings.model).transcribe(file)
+                val raw = transcribeWithRetry(file)
                 val cleaned = Cleaner.clean(raw)
                 main.post {
                     if (cleaned.isNotBlank()) {
@@ -112,9 +117,10 @@ class RecorderService : Service() {
                 }
                 delay(1200)
             } catch (e: Exception) {
+                val message = if (e is IOException) "Network error — check your connection" else e.message
                 main.post {
                     bubble.setState(OverlayBubble.State.ERROR)
-                    toast("Failed: ${e.message}")
+                    toast(message ?: "Transcription failed")
                 }
                 delay(1200)
             } finally {
@@ -123,6 +129,21 @@ class RecorderService : Service() {
                 main.post { bubble.setState(OverlayBubble.State.IDLE) }
             }
         }
+    }
+
+    /** One retry on transient network failure; HTTP errors (auth/rate) propagate immediately. */
+    private suspend fun transcribeWithRetry(file: File): String {
+        val transcriber = Transcriber(settings.apiKey, settings.model)
+        var lastError: IOException? = null
+        repeat(2) { attempt ->
+            try {
+                return transcriber.transcribe(file)
+            } catch (e: IOException) {
+                lastError = e
+                if (attempt == 0) delay(800)
+            }
+        }
+        throw lastError ?: IOException("Network error")
     }
 
     private fun flashError() {
@@ -168,6 +189,7 @@ class RecorderService : Service() {
     companion object {
         private const val CHANNEL_ID = "voiceflow_rec"
         private const val NOTIF_ID = 1
+        private const val MIN_RECORD_MS = 700L
 
         fun start(context: Context) {
             ContextCompat.startForegroundService(context, Intent(context, RecorderService::class.java))
