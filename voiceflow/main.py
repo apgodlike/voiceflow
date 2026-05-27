@@ -107,7 +107,7 @@ class App:
         try:
             raw = transcriber.transcribe(audio_path)
             cleaned = self._clean(raw)
-            paster.paste(cleaned)
+            paster.paste(cleaned, preserve_clipboard=self._cfg.get("preserve_clipboard", False))
             q.mark_success(rid)
             self._ui.toast("Pasted ✓")
         except TranscriptionError as exc:
@@ -125,6 +125,8 @@ class App:
             dictionary=self._cfg.get("dictionary"),
             extra_fillers=self._cfg.get("extra_fillers"),
             voice_commands=self._cfg.get("voice_commands", False),
+            code_mode=self._cfg.get("code_mode", False),
+            raw_mode=self._cfg.get("raw_mode", False),
         )
 
     def _on_segment(self, index: int, path: Path) -> None:
@@ -153,7 +155,7 @@ class App:
                 q.mark_success(rid)  # nothing said — drop the recording
                 return
             cleaned = self._clean(raw)
-            paster.paste(cleaned)
+            paster.paste(cleaned, preserve_clipboard=self._cfg.get("preserve_clipboard", False))
             q.mark_success(rid)
             self._ui.toast("Pasted ✓")
         except Exception as exc:

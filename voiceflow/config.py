@@ -22,6 +22,9 @@ DEFAULTS: dict[str, Any] = {
     "dictionary": {},          # {"spoken": "Replacement"} — fix mistranscribed terms
     "extra_fillers": [],       # extra words to strip alongside built-in fillers
     "voice_commands": False,   # opt-in: "comma"/"new line"/… → literal punctuation
+    "code_mode": False,        # skip auto-capitalize + auto-period (dictating code)
+    "raw_mode": False,         # deliver verbatim transcript, bypass the cleaner
+    "preserve_clipboard": False,  # restore prior clipboard after paste (verify timing)
 }
 
 

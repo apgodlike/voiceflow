@@ -95,15 +95,32 @@ def _filler_pattern(extra_fillers: list[str] | None) -> re.Pattern:
     )
 
 
+def _capitalize_sentences(text: str) -> str:
+    """Uppercase the first letter of the text and of each new sentence
+    (after `.`/`!`/`?` + space, or after a newline)."""
+    text = re.sub(r"^(\s*)(\w)", lambda m: m.group(1) + m.group(2).upper(), text)
+    return re.sub(
+        r"([.!?]\s+|\n+\s*)(\w)",
+        lambda m: m.group(1) + m.group(2).upper(),
+        text,
+    )
+
+
 def clean(
     text: str,
     *,
     dictionary: dict[str, str] | None = None,
     extra_fillers: list[str] | None = None,
     voice_commands: bool = False,
+    code_mode: bool = False,
+    raw_mode: bool = False,
 ) -> str:
     if not text:
         return text
+
+    # Raw/verbatim: deliver the transcript untouched (bypass all passes).
+    if raw_mode:
+        return text.strip()
 
     result = text
     if dictionary:
@@ -126,22 +143,33 @@ def clean(
     if not result:
         return result
 
-    # Capitalize/terminal-punct ignoring any trailing newline sentinel.
-    ends_with_newline = result.endswith(_NL) or result.endswith(_PARA)
-    result = result[0].upper() + result[1:]
-    if not ends_with_newline and result[-1] not in ".!?":
-        result += "."
+    # Code mode: skip auto-capitalization and the auto-period — keep the text
+    # verbatim-ish (so dictated identifiers/syntax aren't reshaped).
+    if not code_mode:
+        ends_with_newline = result.endswith(_NL) or result.endswith(_PARA)
+        if not ends_with_newline and result[-1] not in ".!?":
+            result += "."
 
-    # Restore newlines last; trim spaces hugging the sentinels.
+    # Restore newlines; trim spaces hugging the sentinels.
     result = re.sub(r"\s*" + re.escape(_PARA) + r"\s*", "\n\n", result)
     result = re.sub(r"\s*" + re.escape(_NL) + r"\s*", "\n", result)
+    result = result.strip()
 
-    return result.strip()
+    if not code_mode:
+        result = _capitalize_sentences(result)
+    return result
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("text")
     parser.add_argument("--voice-commands", action="store_true")
+    parser.add_argument("--code-mode", action="store_true")
+    parser.add_argument("--raw", action="store_true")
     args = parser.parse_args()
-    print(clean(args.text, voice_commands=args.voice_commands))
+    print(clean(
+        args.text,
+        voice_commands=args.voice_commands,
+        code_mode=args.code_mode,
+        raw_mode=args.raw,
+    ))

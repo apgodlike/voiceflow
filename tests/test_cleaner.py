@@ -94,11 +94,11 @@ def test_voice_command_question_mark():
 
 
 def test_voice_command_new_line():
-    assert clean("line one new line line two", voice_commands=True) == "Line one\nline two."
+    assert clean("line one new line line two", voice_commands=True) == "Line one\nLine two."
 
 
 def test_voice_command_new_paragraph():
-    assert clean("para one new paragraph para two", voice_commands=True) == "Para one\n\npara two."
+    assert clean("para one new paragraph para two", voice_commands=True) == "Para one\n\nPara two."
 
 
 def test_voice_command_trailing_newline_no_period_appended():
@@ -107,4 +107,42 @@ def test_voice_command_trailing_newline_no_period_appended():
 
 def test_voice_command_paragraph_beats_line():
     # "new paragraph" must not be partially matched as "new line"
-    assert clean("a new paragraph b", voice_commands=True) == "A\n\nb."
+    assert clean("a new paragraph b", voice_commands=True) == "A\n\nB."
+
+
+# ── smart sentence capitalization ──────────────────────────────────────────
+
+def test_capitalizes_each_sentence():
+    assert clean("hello there. how are you? i am fine") == "Hello there. How are you? I am fine."
+
+
+def test_capitalizes_after_voice_command_period():
+    assert clean("done period really question mark", voice_commands=True) == "Done. Really?"
+
+
+def test_capitalizes_after_newline():
+    assert clean("first line new line second line", voice_commands=True) == "First line\nSecond line."
+
+
+# ── raw mode ───────────────────────────────────────────────────────────────
+
+def test_raw_mode_bypasses_everything():
+    assert clean("  um so basically hello world  ", raw_mode=True) == "um so basically hello world"
+
+
+def test_raw_mode_ignores_other_options():
+    assert clean("hello comma world", raw_mode=True, voice_commands=True) == "hello comma world"
+
+
+# ── code mode ──────────────────────────────────────────────────────────────
+
+def test_code_mode_no_capitalize_no_period():
+    assert clean("print hello world", code_mode=True) == "print hello world"
+
+
+def test_code_mode_still_strips_fillers():
+    assert clean("um print hello", code_mode=True) == "print hello"
+
+
+def test_code_mode_preserves_existing_terminal_punct():
+    assert clean("return x.", code_mode=True) == "return x."

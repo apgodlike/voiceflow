@@ -35,3 +35,38 @@ def test_paste_uses_ctrl_v_on_windows():
     args = mock_hotkey.call_args[0]
     assert "ctrl" in args
     assert "v" in args
+
+
+def test_preserve_clipboard_restores_prior_after_success():
+    with patch("voiceflow.paster.pyperclip.paste", return_value="OLD") as mock_read, \
+         patch("voiceflow.paster.pyperclip.copy") as mock_copy, \
+         patch("voiceflow.paster.pyautogui.hotkey"), \
+         patch("voiceflow.paster.time.sleep"):
+        result = paste("dictated", preserve_clipboard=True)
+
+    mock_read.assert_called_once()
+    # first copy delivers the text, second restores the prior clipboard
+    assert mock_copy.call_args_list == [call("dictated"), call("OLD")]
+    assert result is True
+
+
+def test_preserve_clipboard_does_not_restore_on_paste_failure():
+    with patch("voiceflow.paster.pyperclip.paste", return_value="OLD"), \
+         patch("voiceflow.paster.pyperclip.copy") as mock_copy, \
+         patch("voiceflow.paster.pyautogui.hotkey", side_effect=RuntimeError("blocked")), \
+         patch("voiceflow.paster.time.sleep"):
+        result = paste("dictated", preserve_clipboard=True)
+
+    # only the text copy — prior NOT restored, so text stays recoverable
+    mock_copy.assert_called_once_with("dictated")
+    assert result is False
+
+
+def test_preserve_clipboard_off_does_not_read_clipboard():
+    with patch("voiceflow.paster.pyperclip.paste") as mock_read, \
+         patch("voiceflow.paster.pyperclip.copy") as mock_copy, \
+         patch("voiceflow.paster.pyautogui.hotkey"):
+        paste("dictated")
+
+    mock_read.assert_not_called()
+    mock_copy.assert_called_once_with("dictated")
