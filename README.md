@@ -2,7 +2,18 @@
 
 Windows desktop voice-to-text app. Hold or double-tap **Left Ctrl + Left Alt** → mic records → OpenAI transcription → filler words stripped → cleaned text auto-pasted at cursor via clipboard + Ctrl+V.
 
-## Quick Start
+## Download (for users)
+
+1. Grab the latest **`VoiceFlow-Setup.exe`** from the
+   [Releases page](https://github.com/apgodlike/voiceflow/releases).
+2. Run it. Windows may show "Windows protected your PC" (the app is unsigned) —
+   click **More info → Run anyway**.
+3. On first launch, paste your OpenAI API key in Settings. Need one? See
+   [Getting an OpenAI API key](docs/getting-an-openai-api-key.md).
+
+That's it — hold **Ctrl + Alt** and talk. Want to run from source instead? See below.
+
+## Quick Start (from source)
 
 **Requirements:** Python 3.11+, Windows 11, OpenAI API key.
 
