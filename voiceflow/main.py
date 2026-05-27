@@ -3,7 +3,7 @@ import logging
 import logging.handlers
 import os
 import threading
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -17,7 +17,8 @@ from voiceflow.ui import UI
 logger = logging.getLogger("voiceflow.main")
 
 SWEEP_INTERVAL_SEC = 60
-MAX_WORKERS = 2
+MAX_WORKERS = 4  # segments transcribe concurrently during recording
+SEGMENT_RESULT_TIMEOUT_SEC = 60
 _LOG_FORMAT = "%(asctime)s %(levelname)s %(name)s: %(message)s"
 
 
@@ -53,6 +54,10 @@ class App:
         self._cfg = config.load()
         self._apply_config_env()
         self._executor = ThreadPoolExecutor(max_workers=MAX_WORKERS)
+        # Per-recording segment fast-path state (one recording active at a time).
+        self._seg_lock = threading.Lock()
+        self._seg_futures: dict[int, Future] = {}
+        self._seg_paths: dict[int, Path] = {}
         self._ui = UI(
             self._cfg,
             on_settings_saved=self._on_settings_saved,
@@ -74,6 +79,7 @@ class App:
         if key:
             os.environ["OPENAI_API_KEY"] = key
         os.environ["VOICEFLOW_MODEL"] = config.resolved_model(self._cfg)
+        transcriber.reset_client()  # key/model may have changed — rebuild lazily
 
     def _on_settings_saved(self, cfg: dict) -> None:
         config.save(cfg)
@@ -92,10 +98,15 @@ class App:
     # ── pipeline ────────────────────────────────────────────────────────────
 
     def _process_job(self, rid: str, audio_path: Path) -> None:
+        """Full-file path: single transcription of the whole recording.
+
+        Used by the retry sweeper and as the fast-path fallback. Owns the
+        queue success/failure transitions for ``rid``.
+        """
         self._set_state("transcribing")
         try:
             raw = transcriber.transcribe(audio_path)
-            cleaned = cleaner.clean(raw)
+            cleaned = self._clean(raw)
             paster.paste(cleaned)
             q.mark_success(rid)
             self._ui.toast("Pasted ✓")
@@ -107,8 +118,62 @@ class App:
             self._set_state("idle")
             self._tray.set_failed_count(len(q.list_pending()))
 
+    def _clean(self, raw: str) -> str:
+        """Apply the cleaner with the user's current config-driven options."""
+        return cleaner.clean(
+            raw,
+            dictionary=self._cfg.get("dictionary"),
+            extra_fillers=self._cfg.get("extra_fillers"),
+            voice_commands=self._cfg.get("voice_commands", False),
+        )
+
+    def _on_segment(self, index: int, path: Path) -> None:
+        """A segment closed mid-recording — start transcribing it now."""
+        fut = self._executor.submit(transcriber.transcribe, path)
+        with self._seg_lock:
+            self._seg_futures[index] = fut
+            self._seg_paths[index] = path
+
+    def _finalize_job(self, rid: str, full_path: Path, futures: dict[int, Future],
+                      seg_paths: dict[int, Path]) -> None:
+        """Stitch the per-segment transcriptions in order and paste.
+
+        On any segment error, discard the partial result and fall back to a
+        single transcription of the full file (which keeps the queue/retry
+        and privacy model intact). Segment temp files are always deleted.
+        """
+        self._set_state("transcribing")
+        try:
+            parts = [
+                (futures[i].result(timeout=SEGMENT_RESULT_TIMEOUT_SEC) or "")
+                for i in sorted(futures)
+            ]
+            raw = " ".join(p for p in parts if p).strip()
+            if not raw:
+                q.mark_success(rid)  # nothing said — drop the recording
+                return
+            cleaned = self._clean(raw)
+            paster.paste(cleaned)
+            q.mark_success(rid)
+            self._ui.toast("Pasted ✓")
+        except Exception as exc:
+            logger.warning("Segment fast-path failed for %s, using full file: %s", rid, exc)
+            self._process_job(rid, full_path)
+        finally:
+            self._cleanup_segments(seg_paths)
+            self._set_state("idle")
+            self._tray.set_failed_count(len(q.list_pending()))
+
+    @staticmethod
+    def _cleanup_segments(seg_paths: dict[int, Path]) -> None:
+        for p in seg_paths.values():
+            Path(p).unlink(missing_ok=True)
+
     def _on_start(self) -> None:
-        self._current_rid = recorder.start_recording()
+        with self._seg_lock:
+            self._seg_futures = {}
+            self._seg_paths = {}
+        self._current_rid = recorder.start_recording(on_segment=self._on_segment)
         logger.info("Recording started: %s", self._current_rid)
         self._set_state("recording")
 
@@ -117,11 +182,17 @@ class App:
         if rid is None:
             return
         self._current_rid = None
-        audio = recorder.stop_recording(rid)
+        full = recorder.stop_recording(rid)  # fires on_segment for the final segment
         logger.info("Recording stopped: %s", rid)
-        q.enqueue(rid, audio)
-        self._executor.submit(self._process_job, rid, audio)
-        self._set_state("idle")
+        with self._seg_lock:
+            futures = dict(self._seg_futures)
+            seg_paths = dict(self._seg_paths)
+        q.enqueue(rid, full)  # durable fallback unit
+        self._set_state("transcribing")
+        threading.Thread(
+            target=self._finalize_job, args=(rid, full, futures, seg_paths),
+            daemon=True, name=f"finalize-{rid[:8]}",
+        ).start()
 
     # ── retry sweeper ─────────────────────────────────────────────────────────
 

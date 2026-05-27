@@ -15,9 +15,30 @@ from openai import (
 
 logger = logging.getLogger("voiceflow.transcriber")
 
+_client: OpenAI | None = None
+
 
 class TranscriptionError(Exception):
     pass
+
+
+def _get_client() -> OpenAI:
+    """Reused across calls so the HTTP connection pool / TLS session persists.
+
+    A fresh OpenAI() per call re-did the TLS handshake every time; caching it
+    removes that setup cost from each transcription.
+    """
+    global _client
+    if _client is None:
+        _client = OpenAI()
+    return _client
+
+
+def reset_client() -> None:
+    """Drop the cached client so the next call rebuilds it (e.g. after the
+    API key changes in Settings — the client reads the key at construction)."""
+    global _client
+    _client = None
 
 
 def _model() -> str:
@@ -25,7 +46,7 @@ def _model() -> str:
 
 
 def transcribe(audio_path: Path) -> str:
-    client = OpenAI()
+    client = _get_client()
     size_kb = audio_path.stat().st_size / 1024
     model = _model()
     logger.info("Transcribing %s (%.1f KB) via %s", audio_path.name, size_kb, model)

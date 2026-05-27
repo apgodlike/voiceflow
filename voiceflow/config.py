@@ -19,6 +19,9 @@ DEFAULTS: dict[str, Any] = {
     "model": "gpt-4o-mini-transcribe",
     "notifications_enabled": True,
     "start_on_login": True,
+    "dictionary": {},          # {"spoken": "Replacement"} — fix mistranscribed terms
+    "extra_fillers": [],       # extra words to strip alongside built-in fillers
+    "voice_commands": False,   # opt-in: "comma"/"new line"/… → literal punctuation
 }
 
 

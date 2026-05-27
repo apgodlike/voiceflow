@@ -4,7 +4,45 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from voiceflow import transcriber
 from voiceflow.transcriber import TranscriptionError, transcribe
+
+
+@pytest.fixture(autouse=True)
+def _reset_client():
+    """The module caches the OpenAI client; clear it so each test's patched
+    OpenAI is the one that gets built."""
+    transcriber.reset_client()
+    yield
+    transcriber.reset_client()
+
+
+def test_client_reused_across_calls(tmp_path):
+    wav = tmp_path / "test.wav"
+    wav.write_bytes(b"RIFF" + b"\x00" * 36)
+    mock_response = MagicMock(text="hi")
+    mock_client = MagicMock()
+    mock_client.audio.transcriptions.create.return_value = mock_response
+
+    with patch("voiceflow.transcriber.OpenAI", return_value=mock_client) as factory:
+        transcribe(wav)
+        transcribe(wav)
+
+    factory.assert_called_once()  # one client built, reused for both calls
+
+
+def test_reset_client_rebuilds(tmp_path):
+    wav = tmp_path / "test.wav"
+    wav.write_bytes(b"RIFF" + b"\x00" * 36)
+    mock_client = MagicMock()
+    mock_client.audio.transcriptions.create.return_value = MagicMock(text="hi")
+
+    with patch("voiceflow.transcriber.OpenAI", return_value=mock_client) as factory:
+        transcribe(wav)
+        transcriber.reset_client()
+        transcribe(wav)
+
+    assert factory.call_count == 2
 
 
 def test_returns_stripped_text(tmp_path):

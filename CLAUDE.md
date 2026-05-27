@@ -46,15 +46,17 @@ hotkey.py → recorder.py → queue.py → transcriber.py → cleaner.py → pas
 
 **Key design constraints:**
 
-1. **Audio written to disk during recording** — `recorder.py` uses `soundfile.SoundFile` in write mode (OGG/Vorbis) and flushes each chunk in the `sounddevice` callback. Transcription is called only after `stop_recording()` closes the file. Do not buffer audio in memory.
+1. **Audio written to disk during recording** — `recorder.py` uses `soundfile.SoundFile` in write mode (OGG/Vorbis) and flushes each chunk in the `sounddevice` callback. Do not buffer audio in memory.
 
-2. **No retry logic in `transcriber.py`** — it raises `TranscriptionError` on any failure. Retries are owned entirely by `queue.py` + the sweeper in `main.py`.
+2. **Segmented fast-path with full-file fallback (latency)** — recorder writes the **full** continuous OGG (`{rid}.ogg`, the durable unit) *plus* rolling **segment** files (`{rid}.seg{n}.ogg`) cut on silence by `_SegmentCutter`. Each closed segment fires `on_segment`, so `main.py` transcribes segments concurrently *during* recording; on stop it stitches results in index order and pastes. If any segment transcription fails, it discards the partial and falls back to transcribing the full file via the queue path. Cuts land only inside silence gaps → no spoken word spans a boundary → plain concatenation, no overlap/dedup. The queue/retry/privacy model operates only on the full file; segments are ephemeral and always deleted after finalize.
 
-3. **Clipboard always set before paste** — `paster.paste()` calls `pyperclip.copy()` unconditionally before attempting `pyautogui.hotkey()`. If pyautogui fails, the function logs a warning and returns `False`; caller must not treat this as fatal.
+3. **No retry logic in `transcriber.py`** — it raises `TranscriptionError` on any failure. Retries are owned entirely by `queue.py` + the sweeper in `main.py`. The module caches one `OpenAI` client (connection reuse); `reset_client()` drops it after a key/model change.
 
-4. **Queue files are atomic** — `queue.py` writes to `.tmp` then `os.replace()`. Never write queue JSON directly to the target path.
+4. **Clipboard always set before paste** — `paster.paste()` calls `pyperclip.copy()` unconditionally before attempting `pyautogui.hotkey()`. If pyautogui fails, the function logs a warning and returns `False`; caller must not treat this as fatal.
 
-5. **No transcript persistence (privacy)** — `mark_success` deletes the audio file and the queue entry; nothing is stored. Audio survives only on failure, so a job can be retried. Never log dictated content — logs carry metadata only.
+5. **Queue files are atomic** — `queue.py` writes to `.tmp` then `os.replace()`. Never write queue JSON directly to the target path.
+
+6. **No transcript persistence (privacy)** — `mark_success` deletes the audio file and the queue entry; nothing is stored. Audio survives only on failure, so a job can be retried. Segment temp files hold dictated audio too — they are deleted after every finalize (the full file is the retry source). Never log dictated content — logs carry metadata only.
 
 ## Hotkey State Machine
 
@@ -76,6 +78,8 @@ States: `IDLE → RECORDING_HOLD → IDLE` (hold path) or `IDLE → RECORDING_TO
 5. Capitalize first char, append `.` if no terminal punctuation
 
 `like` is only stripped when preceded by a "to be" verb (`was/am/were/is/are/been/being/be`). The regex captures the verb in group 1 and substitutes back `\1` to preserve the verb.
+
+`clean()` takes three optional config-driven kwargs (defaults reproduce the original zero-config behavior, so `clean(text)` is unchanged): `dictionary` (phrase→replacement map, applied first, longest-key-first, case-insensitive, target inserted verbatim via a lambda so `\1` in the value stays literal), `extra_fillers` (merged into the built-in filler regex), and `voice_commands` (opt-in, default off — spoken "comma"/"period"/"new line"/"new paragraph"/… become literal symbols; newlines round-trip through `\x00…\x00` sentinels that survive whitespace collapse and are restored last). `main.App._clean` passes the user's `config.json` values in; there is no Settings-GUI editor for these yet (users edit `config.json` directly).
 
 ## Tray
 
