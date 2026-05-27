@@ -12,13 +12,24 @@ python -m venv venv
 venv\Scripts\activate
 pip install -r requirements.txt
 
-copy .env.example .env
-# Edit .env — set OPENAI_API_KEY=sk-...
-
 python -m voiceflow.main
 ```
 
-Tray icon appears in system tray. Hold Ctrl+Alt to record.
+On first launch the **Settings** window opens — paste your OpenAI API key and
+save. A tray icon also appears. Hold Ctrl+Alt to record.
+
+> Developers can instead set `OPENAI_API_KEY` in a `.env` file (copy
+> `.env.example`); the env var is used as a fallback when no key is saved in Settings.
+
+### Window & tray
+
+- **Main window** shows status + how-to. Closing or minimizing it keeps VoiceFlow
+  running in the tray — it does not quit.
+- **Tray menu** (right-click): Open VoiceFlow · Settings · Retry Failed · Quit.
+  **Quit** is the only way to fully stop the app.
+- A small **overlay** appears while recording / transcribing, and a silent toast
+  confirms each paste (toggle off in Settings).
+- **Start on login** checkbox (default on) registers VoiceFlow to launch at sign-in.
 
 ## Hotkey
 

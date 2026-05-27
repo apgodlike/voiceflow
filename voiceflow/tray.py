@@ -24,12 +24,14 @@ def _make_icon(color: str) -> Image.Image:
 
 
 class Tray:
-    def __init__(self, on_quit=None, on_retry=None) -> None:
+    def __init__(self, on_quit=None, on_retry=None, on_open=None, on_settings=None) -> None:
         self._state: Literal["idle", "recording", "transcribing"] = "idle"
         self._failed_count = 0
         self._lock = threading.Lock()
         self._on_quit_cb = on_quit
         self._on_retry_cb = on_retry
+        self._on_open_cb = on_open
+        self._on_settings_cb = on_settings
         self._icon = pystray.Icon(
             "VoiceFlow",
             _make_icon(_ICON_COLORS["idle"]),
@@ -82,6 +84,8 @@ class Tray:
 
         items: list[pystray.MenuItem] = [
             pystray.MenuItem(f"Status: {state}", None, enabled=False),
+            pystray.MenuItem("Open VoiceFlow", self._on_open, default=True),
+            pystray.MenuItem("Settings…", self._on_settings),
             pystray.Menu.SEPARATOR,
         ]
 
@@ -95,6 +99,14 @@ class Tray:
     def _on_retry(self, icon, item) -> None:
         if self._on_retry_cb:
             self._on_retry_cb()
+
+    def _on_open(self, icon, item) -> None:
+        if self._on_open_cb:
+            self._on_open_cb()
+
+    def _on_settings(self, icon, item) -> None:
+        if self._on_settings_cb:
+            self._on_settings_cb()
 
     def _on_quit(self, icon, item) -> None:
         if self._on_quit_cb:
