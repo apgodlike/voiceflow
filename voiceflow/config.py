@@ -36,6 +36,8 @@ def load() -> dict[str, Any]:
             cfg.update(json.loads(paths.CONFIG_PATH.read_text(encoding="utf-8")))
     except (json.JSONDecodeError, OSError) as exc:
         logger.warning("Could not read config (%s); using defaults", exc)
+    for warning in validate(cfg):
+        logger.warning("Config warning: %s", warning)
     return cfg
 
 
@@ -44,6 +46,50 @@ def save(cfg: dict[str, Any]) -> None:
     tmp = paths.CONFIG_PATH.with_suffix(".tmp")
     tmp.write_text(json.dumps(cfg, indent=2), encoding="utf-8")
     os.replace(tmp, paths.CONFIG_PATH)
+
+
+def validate(cfg: dict[str, Any]) -> list[str]:
+    """Return a list of human-readable warnings for bad config values.
+
+    Callers decide what to do (log, toast, etc.); this fn never raises.
+    """
+    warnings: list[str] = []
+
+    dictionary = cfg.get("dictionary", {})
+    if not isinstance(dictionary, dict):
+        warnings.append("'dictionary' must be a JSON object {\"spoken\": \"Replacement\"}; ignoring.")
+    else:
+        for k, v in dictionary.items():
+            if not isinstance(k, str) or not isinstance(v, str):
+                warnings.append(
+                    f"'dictionary' entry {k!r}: both key and value must be strings; ignoring entry."
+                )
+
+    extra_fillers = cfg.get("extra_fillers", [])
+    if not isinstance(extra_fillers, list):
+        warnings.append("'extra_fillers' must be a JSON array of strings; ignoring.")
+    else:
+        for item in extra_fillers:
+            if not isinstance(item, str):
+                warnings.append(
+                    f"'extra_fillers' contains non-string item {item!r}; ignoring entry."
+                )
+
+    max_sec = cfg.get("max_recording_sec", 600)
+    if not isinstance(max_sec, (int, float)):
+        warnings.append("'max_recording_sec' must be a number (seconds, 0 to disable); ignoring.")
+    elif max_sec < 0:
+        warnings.append(f"'max_recording_sec' is {max_sec}; must be ≥ 0 (use 0 to disable cap).")
+
+    model = cfg.get("model", "")
+    if model and not isinstance(model, str):
+        warnings.append("'model' must be a string; falling back to default.")
+
+    hotkey = cfg.get("hotkey", "")
+    if hotkey and not isinstance(hotkey, str):
+        warnings.append("'hotkey' must be a string (e.g. \"ctrl+alt\"); falling back to default.")
+
+    return warnings
 
 
 def resolved_api_key(cfg: dict[str, Any]) -> str:

@@ -42,3 +42,53 @@ def test_resolved_model_falls_back_to_default():
 
 def test_max_recording_cap_default_is_ten_minutes():
     assert config.DEFAULTS["max_recording_sec"] == 600
+
+
+# ── validate ──────────────────────────────────────────────────────────────────
+
+def test_validate_clean_config_no_warnings():
+    assert config.validate(config.DEFAULTS) == []
+
+
+def test_validate_dictionary_not_dict():
+    warns = config.validate({**config.DEFAULTS, "dictionary": ["a", "b"]})
+    assert any("dictionary" in w for w in warns)
+
+
+def test_validate_dictionary_non_string_value():
+    warns = config.validate({**config.DEFAULTS, "dictionary": {"hello": 42}})
+    assert any("dictionary" in w for w in warns)
+
+
+def test_validate_extra_fillers_not_list():
+    warns = config.validate({**config.DEFAULTS, "extra_fillers": "kinda"})
+    assert any("extra_fillers" in w for w in warns)
+
+
+def test_validate_extra_fillers_non_string_item():
+    warns = config.validate({**config.DEFAULTS, "extra_fillers": [1, 2]})
+    assert any("extra_fillers" in w for w in warns)
+
+
+def test_validate_max_recording_sec_negative():
+    warns = config.validate({**config.DEFAULTS, "max_recording_sec": -1})
+    assert any("max_recording_sec" in w for w in warns)
+
+
+def test_validate_max_recording_sec_zero_allowed():
+    assert config.validate({**config.DEFAULTS, "max_recording_sec": 0}) == []
+
+
+def test_validate_max_recording_sec_not_number():
+    warns = config.validate({**config.DEFAULTS, "max_recording_sec": "ten"})
+    assert any("max_recording_sec" in w for w in warns)
+
+
+def test_validate_warnings_logged_on_load(tmp_path, caplog):
+    import logging
+    cfg_path = tmp_path / "config.json"
+    cfg_path.write_text('{"extra_fillers": "bad"}', encoding="utf-8")
+    with patch("voiceflow.paths.CONFIG_PATH", cfg_path):
+        with caplog.at_level(logging.WARNING, logger="voiceflow.config"):
+            config.load()
+    assert any("extra_fillers" in r.message for r in caplog.records)
