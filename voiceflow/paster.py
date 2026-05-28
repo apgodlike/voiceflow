@@ -16,11 +16,35 @@ _PASTE_KEY = "ctrl" if sys.platform != "darwin" else "command"
 RESTORE_DELAY_SEC = 0.3
 
 
+def _type_text(text: str) -> bool:
+    """Type text character-by-character via pynput. Supports Unicode.
+
+    Used when the target app blocks Ctrl+V clipboard paste (e.g. some terminals
+    or remote-desktop sessions). Does not touch the clipboard at all.
+    """
+    try:
+        from pynput.keyboard import Controller  # already a dep via hotkey.py
+        Controller().type(text)
+        return True
+    except Exception as exc:
+        logger.warning("Type simulation failed: %s", exc)
+        return False
+
+
 def paste(text: str, *, preserve_clipboard: bool = False,
+          paste_mode: str = "clipboard",
           restore_delay: float = RESTORE_DELAY_SEC) -> bool:
-    """Copy ``text`` then simulate paste. With ``preserve_clipboard`` the
-    caller's previous clipboard is restored after a short delay — but only on
-    a successful paste, so a failed paste still leaves the text recoverable."""
+    """Deliver ``text`` to the focused window.
+
+    ``paste_mode="clipboard"`` (default) copies to clipboard then Ctrl+V.
+    ``paste_mode="type"`` types characters one by one (for apps blocking Ctrl+V);
+    in this mode ``preserve_clipboard`` is ignored since the clipboard is untouched.
+
+    On clipboard mode failure the text stays in the clipboard so it is recoverable.
+    """
+    if paste_mode == "type":
+        return _type_text(text)
+
     prior = None
     if preserve_clipboard:
         try:

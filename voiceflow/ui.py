@@ -7,9 +7,10 @@ event loops do not fight.
 
 No method here makes a sound — toasts are silent by design.
 """
+import json
 import logging
 import tkinter as tk
-from tkinter import ttk
+from tkinter import messagebox, ttk
 from typing import Any, Callable
 
 from voiceflow import paths
@@ -18,6 +19,24 @@ logger = logging.getLogger("voiceflow.ui")
 
 _COLORS = {"recording": "#e03030", "transcribing": "#e0a000", "idle": "#808080"}
 _MODELS = ["gpt-4o-mini-transcribe", "gpt-4o-transcribe"]
+_SYSTEM_DEFAULT_DEV = "System default"
+
+
+def _query_input_devices() -> list[tuple[int, str]]:
+    """Return [(index, display_name), ...] for input-capable devices.
+
+    Index -1 is the sentinel for system default (maps to None in config).
+    Returns only [(-1, "System default")] when sounddevice is unavailable.
+    """
+    result: list[tuple[int, str]] = [(-1, _SYSTEM_DEFAULT_DEV)]
+    try:
+        import sounddevice as sd  # optional — ui still works without mic hardware
+        for i, dev in enumerate(sd.query_devices()):
+            if dev["max_input_channels"] > 0:
+                result.append((i, dev["name"]))
+    except Exception:
+        pass
+    return result
 
 _HOWTO = (
     "Hold  Ctrl + Alt   → record while held, release to paste\n"
@@ -135,36 +154,156 @@ class UI:
     def open_settings(self) -> None:
         self.root.after(0, self._open_settings)
 
-    def _open_settings(self) -> None:
+    def _open_settings(self) -> None:  # noqa: C901 (complexity — intentional, all one dialog)
         win = tk.Toplevel(self.root)
         win.title("VoiceFlow Settings")
-        win.resizable(False, False)
+        win.geometry("520x540")
+        win.minsize(460, 460)
+        win.resizable(True, True)
         win.transient(self.root)
         win.grab_set()
 
+        outer = ttk.Frame(win, padding=16)
+        outer.pack(fill="both", expand=True)
+        outer.columnconfigure(0, weight=1)
+        outer.rowconfigure(0, weight=1)
+
+        nb = ttk.Notebook(outer)
+        nb.grid(row=0, column=0, sticky="nsew")
+
+        # ── Tab: API ──────────────────────────────────────────────────────────
+        tab_api = ttk.Frame(nb, padding=12)
+        nb.add(tab_api, text="API")
+
         key_var = tk.StringVar(value=self._cfg.get("openai_api_key", ""))
         model_var = tk.StringVar(value=self._cfg.get("model", _MODELS[0]))
-        notif_var = tk.BooleanVar(value=bool(self._cfg.get("notifications_enabled", True)))
-        startup_var = tk.BooleanVar(value=bool(self._cfg.get("start_on_login", True)))
 
-        frm = ttk.Frame(win, padding=16)
-        frm.pack(fill="both", expand=True)
-
-        ttk.Label(frm, text="OpenAI API key").grid(row=0, column=0, sticky="w")
-        ttk.Entry(frm, textvariable=key_var, show="*", width=40).grid(row=1, column=0, columnspan=2, sticky="we", pady=(0, 8))
-
-        ttk.Label(frm, text="Model").grid(row=4, column=0, sticky="w")
-        ttk.Combobox(frm, textvariable=model_var, values=_MODELS, state="readonly", width=28).grid(
-            row=5, column=0, sticky="w", pady=(0, 8)
+        ttk.Label(tab_api, text="OpenAI API key").pack(anchor="w")
+        ttk.Entry(tab_api, textvariable=key_var, show="*", width=46).pack(fill="x", pady=(2, 10))
+        ttk.Label(tab_api, text="Transcription model").pack(anchor="w")
+        ttk.Combobox(tab_api, textvariable=model_var, values=_MODELS, state="readonly", width=32).pack(
+            anchor="w", pady=(2, 0)
         )
 
-        ttk.Checkbutton(frm, text="Show silent notifications", variable=notif_var).grid(row=6, column=0, sticky="w")
-        ttk.Checkbutton(frm, text="Start when I log in", variable=startup_var).grid(row=7, column=0, sticky="w", pady=(0, 8))
+        # ── Tab: Recording ────────────────────────────────────────────────────
+        tab_rec = ttk.Frame(nb, padding=12)
+        nb.add(tab_rec, text="Recording")
+
+        lang_var = tk.StringVar(value=self._cfg.get("language", ""))
+        dev_info = _query_input_devices()
+        dev_names = [d[1] for d in dev_info]
+        dev_idx_by_name = {d[1]: d[0] for d in dev_info}
+
+        cur_dev_idx = self._cfg.get("input_device")
+        cur_dev_name = _SYSTEM_DEFAULT_DEV
+        if cur_dev_idx is not None:
+            for idx, name in dev_info:
+                if idx == cur_dev_idx:
+                    cur_dev_name = name
+                    break
+        dev_var = tk.StringVar(value=cur_dev_name)
+
+        ttk.Label(tab_rec, text="Input device").pack(anchor="w")
+        ttk.Combobox(tab_rec, textvariable=dev_var, values=dev_names, state="readonly", width=40).pack(
+            fill="x", pady=(2, 10)
+        )
+        ttk.Label(tab_rec, text="Language hint (ISO-639-1, e.g. en, hi — blank = auto)").pack(anchor="w")
+        ttk.Entry(tab_rec, textvariable=lang_var, width=12).pack(anchor="w", pady=(2, 0))
+
+        # ── Tab: Behavior ─────────────────────────────────────────────────────
+        tab_beh = ttk.Frame(nb, padding=12)
+        nb.add(tab_beh, text="Behavior")
+
+        paste_mode_var = tk.StringVar(value=self._cfg.get("paste_mode", "clipboard"))
+        voice_var = tk.BooleanVar(value=bool(self._cfg.get("voice_commands", False)))
+        code_var = tk.BooleanVar(value=bool(self._cfg.get("code_mode", False)))
+        raw_var = tk.BooleanVar(value=bool(self._cfg.get("raw_mode", False)))
+        preserve_var = tk.BooleanVar(value=bool(self._cfg.get("preserve_clipboard", False)))
+
+        ttk.Label(tab_beh, text="Paste method").pack(anchor="w")
+        ttk.Combobox(
+            tab_beh, textvariable=paste_mode_var,
+            values=["clipboard", "type"], state="readonly", width=14,
+        ).pack(anchor="w", pady=(2, 0))
+        ttk.Label(
+            tab_beh,
+            text="  clipboard — Ctrl+V (default)\n  type — character-by-character (for apps that block Ctrl+V)",
+            foreground="#666666", justify="left",
+        ).pack(anchor="w", pady=(2, 10))
+        ttk.Checkbutton(tab_beh, text='Voice commands ("comma", "new line", …)', variable=voice_var).pack(anchor="w")
+        ttk.Checkbutton(tab_beh, text="Code mode (no auto-capitalize, no trailing period)", variable=code_var).pack(anchor="w")
+        ttk.Checkbutton(tab_beh, text="Raw mode (verbatim transcript, skip all cleaning)", variable=raw_var).pack(anchor="w")
+        ttk.Checkbutton(tab_beh, text="Preserve clipboard (restore prior clipboard after paste)", variable=preserve_var).pack(anchor="w")
+
+        # ── Tab: Text ─────────────────────────────────────────────────────────
+        tab_txt = ttk.Frame(nb, padding=12)
+        nb.add(tab_txt, text="Text")
+        tab_txt.columnconfigure(0, weight=1)
+        tab_txt.rowconfigure(2, weight=1)
+
+        extra_var = tk.StringVar(value=", ".join(self._cfg.get("extra_fillers", [])))
+
+        ttk.Label(tab_txt, text="Extra fillers to strip (comma-separated)").grid(row=0, column=0, sticky="w")
+        ttk.Entry(tab_txt, textvariable=extra_var, width=46).grid(row=1, column=0, sticky="we", pady=(2, 10))
+
+        ttk.Label(tab_txt, text='Dictionary — JSON {"spoken word": "Replacement"}').grid(row=2, column=0, sticky="w")
+        dict_outer = ttk.Frame(tab_txt)
+        dict_outer.grid(row=3, column=0, sticky="nsew", pady=(2, 0))
+        dict_outer.columnconfigure(0, weight=1)
+        dict_outer.rowconfigure(0, weight=1)
+        dict_text = tk.Text(dict_outer, width=46, height=7, font=("Courier New", 9), wrap="none", undo=True)
+        dict_scroll_y = ttk.Scrollbar(dict_outer, command=dict_text.yview)
+        dict_text.configure(yscrollcommand=dict_scroll_y.set)
+        dict_scroll_y.grid(row=0, column=1, sticky="ns")
+        dict_text.grid(row=0, column=0, sticky="nsew")
+        dict_text.insert("1.0", json.dumps(self._cfg.get("dictionary", {}), indent=2, ensure_ascii=False))
+
+        # ── Footer (always-visible app prefs) ─────────────────────────────────
+        ttk.Separator(outer).grid(row=1, column=0, sticky="we", pady=(10, 6))
+
+        notif_var = tk.BooleanVar(value=bool(self._cfg.get("notifications_enabled", True)))
+        startup_var = tk.BooleanVar(value=bool(self._cfg.get("start_on_login", True)))
+        footer = ttk.Frame(outer)
+        footer.grid(row=2, column=0, sticky="we")
+        ttk.Checkbutton(footer, text="Show notifications", variable=notif_var).pack(side="left")
+        ttk.Checkbutton(footer, text="Start on login", variable=startup_var).pack(side="left", padx=(16, 0))
+
+        # ── Buttons ───────────────────────────────────────────────────────────
+        btns = ttk.Frame(outer)
+        btns.grid(row=3, column=0, sticky="we", pady=(8, 0))
 
         def save() -> None:
+            raw_dict = dict_text.get("1.0", "end").strip()
+            try:
+                dict_val = json.loads(raw_dict or "{}")
+                if not isinstance(dict_val, dict):
+                    raise ValueError("must be a JSON object")
+                for k, v in dict_val.items():
+                    if not isinstance(k, str) or not isinstance(v, str):
+                        raise ValueError(f"key {k!r} and value must both be strings")
+            except (json.JSONDecodeError, ValueError) as exc:
+                messagebox.showerror("Dictionary error", str(exc), parent=win)
+                nb.select(tab_txt)
+                return
+
+            extra_raw = extra_var.get().strip()
+            extra_list = [f.strip() for f in extra_raw.split(",") if f.strip()] if extra_raw else []
+
+            chosen = dev_idx_by_name.get(dev_var.get(), -1)
+            input_device = None if chosen == -1 else chosen
+
             self._cfg.update(
                 openai_api_key=key_var.get().strip(),
                 model=model_var.get(),
+                language=lang_var.get().strip(),
+                input_device=input_device,
+                paste_mode=paste_mode_var.get(),
+                voice_commands=voice_var.get(),
+                code_mode=code_var.get(),
+                raw_mode=raw_var.get(),
+                preserve_clipboard=preserve_var.get(),
+                extra_fillers=extra_list,
+                dictionary=dict_val,
                 notifications_enabled=notif_var.get(),
                 start_on_login=startup_var.get(),
             )
@@ -172,8 +311,6 @@ class UI:
             self._on_settings_saved(self._cfg)
             win.destroy()
 
-        btns = ttk.Frame(frm)
-        btns.grid(row=8, column=0, columnspan=2, sticky="e", pady=(8, 0))
         ttk.Button(btns, text="Cancel", command=win.destroy).pack(side="right", padx=(8, 0))
         ttk.Button(btns, text="Save", command=save).pack(side="right")
 

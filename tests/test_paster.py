@@ -1,5 +1,5 @@
 """Tests for paster.py — monkeypatched pyperclip + pyautogui."""
-from unittest.mock import call, patch
+from unittest.mock import MagicMock, call, patch
 
 import pytest
 
@@ -70,3 +70,40 @@ def test_preserve_clipboard_off_does_not_read_clipboard():
 
     mock_read.assert_not_called()
     mock_copy.assert_called_once_with("dictated")
+
+
+# ── paste_mode="type" ─────────────────────────────────────────────────────────
+
+def test_paste_mode_type_uses_pynput_controller():
+    mock_ctrl = MagicMock()
+    # patch the Controller class inside pynput.keyboard so the local import picks it up
+    with patch("voiceflow.paster.pyperclip.copy") as mock_copy, \
+         patch("voiceflow.paster.pyautogui.hotkey") as mock_hotkey, \
+         patch.dict("sys.modules", {"pynput.keyboard": MagicMock(Controller=MagicMock(return_value=mock_ctrl))}):
+        result = paste("hello", paste_mode="type")
+
+    mock_ctrl.type.assert_called_once_with("hello")
+    mock_copy.assert_not_called()   # clipboard untouched
+    mock_hotkey.assert_not_called()
+    assert result is True
+
+
+def test_paste_mode_type_ignores_preserve_clipboard():
+    mock_ctrl = MagicMock()
+    with patch("voiceflow.paster.pyperclip.paste") as mock_read, \
+         patch("voiceflow.paster.pyperclip.copy") as mock_copy, \
+         patch.dict("sys.modules", {"pynput.keyboard": MagicMock(Controller=MagicMock(return_value=mock_ctrl))}):
+        paste("hello", paste_mode="type", preserve_clipboard=True)
+
+    mock_read.assert_not_called()
+    mock_copy.assert_not_called()
+
+
+def test_paste_mode_type_returns_false_on_failure():
+    # Controller() itself raises — _type_text catches and returns False
+    with patch("voiceflow.paster.pyperclip.copy"), \
+         patch("voiceflow.paster.pyautogui.hotkey"), \
+         patch.dict("sys.modules", {"pynput.keyboard": MagicMock(Controller=MagicMock(side_effect=RuntimeError("blocked")))}):
+        result = paste("hello", paste_mode="type")
+
+    assert result is False

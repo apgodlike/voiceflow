@@ -45,18 +45,20 @@ def _model() -> str:
     return os.environ.get("VOICEFLOW_MODEL", "gpt-4o-mini-transcribe")
 
 
-def transcribe(audio_path: Path) -> str:
+def transcribe(audio_path: Path, language: str | None = None) -> str:
     client = _get_client()
     size_kb = audio_path.stat().st_size / 1024
     model = _model()
     logger.info("Transcribing %s (%.1f KB) via %s", audio_path.name, size_kb, model)
     t0 = time.monotonic()
     try:
+        extra: dict = {"language": language} if language else {}
         with open(audio_path, "rb") as f:
             response = client.audio.transcriptions.create(
                 model=model,
                 file=f,
                 timeout=30,
+                **extra,
             )
         elapsed = time.monotonic() - t0
         logger.info("Transcription done in %.2fs (%d chars)", elapsed, len(response.text))

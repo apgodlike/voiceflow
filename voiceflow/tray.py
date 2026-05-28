@@ -24,14 +24,17 @@ def _make_icon(color: str) -> Image.Image:
 
 
 class Tray:
-    def __init__(self, on_quit=None, on_retry=None, on_open=None, on_settings=None) -> None:
+    def __init__(self, on_quit=None, on_retry=None, on_open=None, on_settings=None,
+                 on_paste_previous=None) -> None:
         self._state: Literal["idle", "recording", "transcribing"] = "idle"
         self._failed_count = 0
+        self._has_previous = False
         self._lock = threading.Lock()
         self._on_quit_cb = on_quit
         self._on_retry_cb = on_retry
         self._on_open_cb = on_open
         self._on_settings_cb = on_settings
+        self._on_paste_previous_cb = on_paste_previous
         self._icon = pystray.Icon(
             "VoiceFlow",
             _make_icon(_ICON_COLORS["idle"]),
@@ -50,6 +53,10 @@ class Tray:
             self._icon.title = f"VoiceFlow — {state}"
         except OSError:
             pass
+
+    def set_has_previous(self, has_previous: bool) -> None:
+        with self._lock:
+            self._has_previous = has_previous
 
     def set_failed_count(self, n: int) -> None:
         with self._lock:
@@ -81,10 +88,12 @@ class Tray:
         with self._lock:
             state = self._state
             failed = self._failed_count
+            has_prev = self._has_previous
 
         items: list[pystray.MenuItem] = [
             pystray.MenuItem(f"Status: {state}", None, enabled=False),
             pystray.MenuItem("Open VoiceFlow", self._on_open, default=True),
+            pystray.MenuItem("Paste Previous", self._on_paste_previous, enabled=has_prev),
             pystray.MenuItem("Settings…", self._on_settings),
             pystray.Menu.SEPARATOR,
         ]
@@ -95,6 +104,10 @@ class Tray:
         items.append(pystray.MenuItem("Quit", self._on_quit))
 
         return tuple(items)
+
+    def _on_paste_previous(self, icon, item) -> None:
+        if self._on_paste_previous_cb:
+            self._on_paste_previous_cb()
 
     def _on_retry(self, icon, item) -> None:
         if self._on_retry_cb:

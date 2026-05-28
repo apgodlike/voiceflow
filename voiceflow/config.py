@@ -26,6 +26,9 @@ DEFAULTS: dict[str, Any] = {
     "raw_mode": False,         # deliver verbatim transcript, bypass the cleaner
     "preserve_clipboard": False,  # restore prior clipboard after paste (verify timing)
     "max_recording_sec": 600,  # auto-stop a runaway recording at 10 min (0 = no cap)
+    "language": "",             # ISO-639-1 hint for transcription (e.g. "en", "hi"); empty = auto
+    "paste_mode": "clipboard",  # "clipboard" (Ctrl+V) or "type" (character-by-character)
+    "input_device": None,       # sounddevice input device index; None = system default
 }
 
 
@@ -88,6 +91,16 @@ def validate(cfg: dict[str, Any]) -> list[str]:
     hotkey = cfg.get("hotkey", "")
     if hotkey and not isinstance(hotkey, str):
         warnings.append("'hotkey' must be a string (e.g. \"ctrl+alt\"); falling back to default.")
+
+    paste_mode = cfg.get("paste_mode", "clipboard")
+    if paste_mode not in ("clipboard", "type"):
+        warnings.append(
+            f"'paste_mode' must be \"clipboard\" or \"type\"; got {paste_mode!r}. Falling back to clipboard."
+        )
+
+    language = cfg.get("language", "")
+    if language and not isinstance(language, str):
+        warnings.append("'language' must be a string (ISO-639-1 code, e.g. \"en\") or empty string.")
 
     return warnings
 

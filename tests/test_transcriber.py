@@ -78,3 +78,31 @@ def test_raises_transcription_error_on_api_failure(tmp_path):
 
     assert "Transcription call failed" in str(exc_info.value)
     assert exc_info.value.__cause__ is not None
+
+
+def test_language_hint_passed_to_api(tmp_path):
+    wav = tmp_path / "test.wav"
+    wav.write_bytes(b"RIFF" + b"\x00" * 36)
+
+    mock_client = MagicMock()
+    mock_client.audio.transcriptions.create.return_value = MagicMock(text="hello")
+
+    with patch("voiceflow.transcriber.OpenAI", return_value=mock_client):
+        transcribe(wav, language="hi")
+
+    kwargs = mock_client.audio.transcriptions.create.call_args.kwargs
+    assert kwargs.get("language") == "hi"
+
+
+def test_no_language_key_when_not_set(tmp_path):
+    wav = tmp_path / "test.wav"
+    wav.write_bytes(b"RIFF" + b"\x00" * 36)
+
+    mock_client = MagicMock()
+    mock_client.audio.transcriptions.create.return_value = MagicMock(text="hello")
+
+    with patch("voiceflow.transcriber.OpenAI", return_value=mock_client):
+        transcribe(wav)  # no language
+
+    kwargs = mock_client.audio.transcriptions.create.call_args.kwargs
+    assert "language" not in kwargs

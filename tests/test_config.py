@@ -84,6 +84,16 @@ def test_validate_max_recording_sec_not_number():
     assert any("max_recording_sec" in w for w in warns)
 
 
+def test_validate_paste_mode_invalid():
+    warns = config.validate({**config.DEFAULTS, "paste_mode": "magic"})
+    assert any("paste_mode" in w for w in warns)
+
+
+def test_validate_paste_mode_valid():
+    assert config.validate({**config.DEFAULTS, "paste_mode": "type"}) == []
+    assert config.validate({**config.DEFAULTS, "paste_mode": "clipboard"}) == []
+
+
 def test_validate_warnings_logged_on_load(tmp_path, caplog):
     import logging
     cfg_path = tmp_path / "config.json"

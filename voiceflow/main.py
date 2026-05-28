@@ -3,6 +3,7 @@ import logging
 import logging.handlers
 import os
 import threading
+from collections import deque
 from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
 
@@ -59,6 +60,7 @@ class App:
         self._seg_lock = threading.Lock()
         self._seg_futures: dict[int, Future] = {}
         self._seg_paths: dict[int, Path] = {}
+        self._recent_texts: deque[str] = deque(maxlen=5)
         self._ui = UI(
             self._cfg,
             on_settings_saved=self._on_settings_saved,
@@ -69,6 +71,7 @@ class App:
             on_retry=self._trigger_retry,
             on_open=self._ui.show_window,
             on_settings=self._ui.open_settings,
+            on_paste_previous=self._paste_previous,
         )
         self._hotkey = HotkeyController(on_start=self._on_start, on_stop=self._on_stop)
 
@@ -106,11 +109,15 @@ class App:
         """
         self._set_state("transcribing")
         try:
-            raw = transcriber.transcribe(audio_path)
+            raw = transcriber.transcribe(audio_path, language=self._cfg.get("language") or None)
             cleaned = self._clean(raw)
-            paster.paste(cleaned, preserve_clipboard=self._cfg.get("preserve_clipboard", False))
+            paster.paste(
+                cleaned,
+                preserve_clipboard=self._cfg.get("preserve_clipboard", False),
+                paste_mode=self._cfg.get("paste_mode", "clipboard"),
+            )
             q.mark_success(rid)
-            self._ui.toast("Pasted ✓")
+            self._on_paste_success(cleaned)
         except TranscriptionError as exc:
             q.mark_failed(rid, str(exc))
             self._ui.toast("Transcription failed — will retry")
@@ -130,9 +137,25 @@ class App:
             raw_mode=self._cfg.get("raw_mode", False),
         )
 
+    def _on_paste_success(self, cleaned: str) -> None:
+        self._recent_texts.appendleft(cleaned)
+        self._tray.set_has_previous(True)
+        self._ui.toast("Pasted ✓")
+
+    def _paste_previous(self) -> None:
+        if not self._recent_texts:
+            return
+        paster.paste(
+            self._recent_texts[0],
+            preserve_clipboard=self._cfg.get("preserve_clipboard", False),
+            paste_mode=self._cfg.get("paste_mode", "clipboard"),
+        )
+        self._ui.toast("Pasted previous ✓")
+
     def _on_segment(self, index: int, path: Path) -> None:
         """A segment closed mid-recording — start transcribing it now."""
-        fut = self._executor.submit(transcriber.transcribe, path)
+        lang = self._cfg.get("language") or None
+        fut = self._executor.submit(transcriber.transcribe, path, lang)
         with self._seg_lock:
             self._seg_futures[index] = fut
             self._seg_paths[index] = path
@@ -156,9 +179,13 @@ class App:
                 q.mark_success(rid)  # nothing said — drop the recording
                 return
             cleaned = self._clean(raw)
-            paster.paste(cleaned, preserve_clipboard=self._cfg.get("preserve_clipboard", False))
+            paster.paste(
+                cleaned,
+                preserve_clipboard=self._cfg.get("preserve_clipboard", False),
+                paste_mode=self._cfg.get("paste_mode", "clipboard"),
+            )
             q.mark_success(rid)
-            self._ui.toast("Pasted ✓")
+            self._on_paste_success(cleaned)
         except Exception as exc:
             logger.warning("Segment fast-path failed for %s, using full file: %s", rid, exc)
             self._process_job(rid, full_path)
@@ -199,7 +226,10 @@ class App:
         with self._seg_lock:
             self._seg_futures = {}
             self._seg_paths = {}
-        self._current_rid = recorder.start_recording(on_segment=self._on_segment)
+        self._current_rid = recorder.start_recording(
+            on_segment=self._on_segment,
+            device=self._cfg.get("input_device"),
+        )
         logger.info("Recording started: %s", self._current_rid)
         self._set_state("recording")
         self._start_max_timer()

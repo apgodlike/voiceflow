@@ -104,7 +104,10 @@ def _new_segment_file(rid: str, index: int) -> tuple[sf.SoundFile, Path]:
     return seg_file, seg_path
 
 
-def start_recording(on_segment: OnSegment | None = None) -> str:
+def start_recording(
+    on_segment: OnSegment | None = None,
+    device: int | str | None = None,
+) -> str:
     RECORDINGS_DIR.mkdir(parents=True, exist_ok=True)
     recording_id = uuid4().hex
     audio_path = RECORDINGS_DIR / f"{recording_id}.ogg"
@@ -133,7 +136,10 @@ def start_recording(on_segment: OnSegment | None = None) -> str:
         if entry["cutter"].feed(_rms(indata), frames):
             _rotate_segment(recording_id, entry)
 
-    stream = sd.InputStream(samplerate=SAMPLE_RATE, channels=CHANNELS, dtype=DTYPE, callback=callback)
+    stream = sd.InputStream(
+        samplerate=SAMPLE_RATE, channels=CHANNELS, dtype=DTYPE,
+        callback=callback, device=device,
+    )
     entry["stream"] = stream
     stream.start()
     _active[recording_id] = entry
