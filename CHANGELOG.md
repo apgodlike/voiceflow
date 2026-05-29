@@ -6,6 +6,16 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-05-29
+
+### Fixed
+- First-run window disappeared immediately on machines where `OPENAI_API_KEY`
+  was set as a system/user environment variable (e.g. from a prior Python or
+  OpenAI SDK install). First-run detection now checks only the VoiceFlow
+  config file, not environment variables.
+- Eliminated 1-frame white flash when starting in tray-only mode — window is
+  now withdrawn before any widgets are drawn.
+
 ## [0.1.1] - 2026-05-29
 
 ### Fixed
