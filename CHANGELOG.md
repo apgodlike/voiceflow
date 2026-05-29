@@ -6,6 +6,18 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-05-29
+
+### Fixed
+- Sweeper race condition: `retry_all()` was picking up in-flight jobs (status=pending),
+  causing two threads to open the same audio file simultaneously (WinError 32). Fixed
+  to only retry `status=failed` jobs. Orphaned pending jobs from a crash are now
+  adopted on next launch.
+- Tiny trailing segment (< 8 KB / ~0.3 s) sent to OpenAI returned HTTP 400 "Audio
+  file corrupted". Segments below the minimum size are now dropped before the API call.
+- Fresh install (no API key): main window now shows on first launch so users can enter
+  setup information. Subsequent launches and boot autostart remain tray-only.
+
 ## [0.1.0] - 2026-05-29
 
 Initial public release.
