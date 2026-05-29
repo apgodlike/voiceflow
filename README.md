@@ -190,6 +190,10 @@ All modules monkeypatched — no network, no mic required.
 
 ## Troubleshooting
 
+**"Failed to execute script" or "python312.dll not found"**
+You ran `VoiceFlow.exe` directly from inside a ZIP file. Windows only extracts the single EXE, leaving the required `_internal\` folder behind.
+Fix: right-click the ZIP → **Extract All** → run `VoiceFlow.exe` from the extracted folder. Or use the installer (`VoiceFlow-Setup.exe`) which handles this automatically.
+
 **Paste doesn't land** — `pyautogui` can fail under UAC-elevated windows. Text is always in the clipboard; paste manually with Ctrl+V. Or switch to `paste_mode: "type"` in Settings.
 
 **Hotkey not detected** — some anti-cheat / accessibility tools intercept `pynput`. Try running as administrator.
