@@ -12,11 +12,24 @@ No subscription. No account. Bring your own OpenAI key.
 <!-- DEMO GIF — record with ScreenToGif: hold Ctrl+Alt → speak → text appears -->
 <!-- ![VoiceFlow demo](docs/images/demo.gif) -->
 
-## Download
+## Install
+
+**Option A — PowerShell one-liner** (recommended):
+
+```powershell
+irm https://raw.githubusercontent.com/apgodlike/voiceflow/main/install.ps1 | iex
+```
+
+Downloads the latest release and launches the installer automatically.
+
+**Option B — Manual download:**
 
 1. Grab **`VoiceFlow-Setup.exe`** from the [Releases page](https://github.com/apgodlike/voiceflow/releases).
-2. Run it. Windows may warn "Windows protected your PC" (unsigned) — click **More info → Run anyway**.
-3. On first launch the Settings window opens — paste your OpenAI API key. Need one? See [Getting an OpenAI API key](docs/getting-an-openai-api-key.md).
+2. Run it.
+
+> **Windows SmartScreen warning** — the app is currently unsigned. Click **More info → Run anyway**. Code signing is in progress; this prompt will disappear in a future release. Source is fully auditable above.
+
+On first launch the Settings window opens — paste your OpenAI API key. Need one? See [Getting an OpenAI API key](docs/getting-an-openai-api-key.md).
 
 Hold **Ctrl + Alt** and talk. That's it.
 
@@ -205,8 +218,6 @@ Fix: right-click the ZIP → **Extract All** → run `VoiceFlow.exe` from the ex
 **Mic not opening** — check Windows Settings → Privacy → Microphone. List devices: `python -c "import sounddevice; print(sounddevice.query_devices())"`.
 
 **Transcription keeps failing** — check your API key in Settings. Failed jobs are retried automatically every 60 s and show as an orange tray icon.
-
-**SmartScreen warning on install** — app is unsigned. Click **More info → Run anyway**. Source is fully auditable above.
 
 ## Privacy
 
