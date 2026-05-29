@@ -38,9 +38,6 @@ _BAR_MAX_H = 28               # center bar max height
 _BAR_MIN_H = 3
 _ANIM_MS = 40                 # 25 fps
 
-_DOT_COUNT = 3
-_DOT_R = 5
-_DOT_SPACING = 20             # center-to-center
 
 
 def _draw_pill_bg(canvas: tk.Canvas, w: int, h: int, fill: str) -> None:
@@ -228,21 +225,36 @@ class UI:
             )
 
     def _draw_transcribing_frame(self) -> None:
-        """3 pulsing dots while the transcription call is in flight."""
+        """Slow traveling sine wave — calm 'thinking' state.
+
+        Same 9 bars as recording but at lower amplitude and dimmer color so
+        it reads clearly as 'processing' rather than 'listening'. The wave
+        travels left→right continuously.  Bars interpolate smoothly from
+        wherever recording left them.
+        """
         t = _time.monotonic()
         canvas = self._canvas
         assert canvas is not None
         canvas.delete("anim")
-        start_cx = (_OVERLAY_W - (_DOT_COUNT - 1) * _DOT_SPACING) // 2
         cy = _OVERLAY_H // 2
-        for i in range(_DOT_COUNT):
-            phase = i * (math.pi * 2 / _DOT_COUNT)
-            alpha = 0.25 + 0.75 * (0.5 + 0.5 * math.sin(t * 4.0 + phase))
-            gray = int(255 * alpha)
+
+        _AMP = _BAR_MAX_H * 0.30          # max wave height ≈ 8 px
+        _SPEED = 3.8                       # rad/s  (~0.6 Hz, slow and calm)
+        _WAVE_K = 2 * math.pi / (_BAR_COUNT - 1)  # one full wavelength across bars
+
+        for i in range(_BAR_COUNT):
+            wave = 0.5 + 0.5 * math.sin(t * _SPEED - i * _WAVE_K)
+            target = _BAR_MIN_H + _AMP * wave
+            self._bar_heights[i] += (target - self._bar_heights[i]) * 0.25
+            h = self._bar_heights[i]
+
+            # Bar color tracks the wave crest: bright at peak, dim at trough
+            gray = int(80 + 120 * wave)    # 80→200, never full white
             color = f"#{gray:02x}{gray:02x}{gray:02x}"
-            cx = start_cx + i * _DOT_SPACING
-            canvas.create_oval(
-                cx - _DOT_R, cy - _DOT_R, cx + _DOT_R, cy + _DOT_R,
+
+            x0 = _PAD_X + i * (_BAR_W + _BAR_GAP)
+            canvas.create_rectangle(
+                x0, int(cy - h / 2), x0 + _BAR_W, int(cy + h / 2),
                 fill=color, outline="", tags="anim",
             )
 
