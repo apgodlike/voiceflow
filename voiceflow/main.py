@@ -142,6 +142,10 @@ class App:
         self._tray.set_has_previous(True)
         self._ui.toast("Pasted ✓")
 
+    def _on_rms_update(self, rms: float) -> None:
+        """Called from the audio thread — just forwards to UI (no Tk calls here)."""
+        self._ui.update_rms(rms)
+
     def _paste_previous(self) -> None:
         if not self._recent_texts:
             return
@@ -229,6 +233,7 @@ class App:
         self._current_rid = recorder.start_recording(
             on_segment=self._on_segment,
             device=self._cfg.get("input_device"),
+            on_rms=self._on_rms_update,
         )
         logger.info("Recording started: %s", self._current_rid)
         self._set_state("recording")

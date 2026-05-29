@@ -9,6 +9,8 @@ No method here makes a sound — toasts are silent by design.
 """
 import json
 import logging
+import math
+import time as _time
 import tkinter as tk
 from tkinter import messagebox, ttk
 from typing import Any, Callable
@@ -20,6 +22,23 @@ logger = logging.getLogger("voiceflow.ui")
 _COLORS = {"recording": "#e03030", "transcribing": "#e0a000", "idle": "#808080"}
 _MODELS = ["gpt-4o-mini-transcribe", "gpt-4o-transcribe"]
 _SYSTEM_DEFAULT_DEV = "System default"
+
+# ── animated overlay geometry ──────────────────────────────────────────────────
+_OV_BG = "#1a1a1a"
+_BAR_COUNT = 7
+_BAR_W = 4
+_BAR_GAP = 5
+_BARS_W = _BAR_COUNT * _BAR_W + (_BAR_COUNT - 1) * _BAR_GAP  # 58 px
+_PAD_X = 13
+_OVERLAY_W = _BARS_W + _PAD_X * 2   # 84 px
+_OVERLAY_H = 40
+_BAR_MAX_H = 26
+_BAR_MIN_H = 3
+_ANIM_MS = 40                        # 25 fps
+
+_DOT_COUNT = 3
+_DOT_R = 5                           # dot radius
+_DOT_SPACING = 18                    # center-to-center
 
 
 def _query_input_devices() -> list[tuple[int, str]]:
@@ -68,8 +87,15 @@ class UI:
             logger.debug("Window icon not set (icon.ico missing)")
 
         self._overlay: tk.Toplevel | None = None
+        self._canvas: tk.Canvas | None = None
+        self._overlay_state: str = "idle"
+        self._anim_running: bool = False
+        self._latest_rms: float = 0.0
+        self._bar_heights: list[float] = [float(_BAR_MIN_H)] * _BAR_COUNT
+
         self._toast: tk.Toplevel | None = None
         self._build_main()
+        self.root.withdraw()  # start hidden — user opens via tray "Open VoiceFlow"
 
     # ── main window ───────────────────────────────────────────────────────────
 
@@ -96,36 +122,94 @@ class UI:
     def set_status(self, text: str, color: str = "#2a8a2a") -> None:
         self.root.after(0, lambda: self._status.config(text=text, foreground=color))
 
-    # ── recording overlay ─────────────────────────────────────────────────────
+    # ── recording overlay — animated waveform ────────────────────────────────
 
     def set_state(self, state: str) -> None:
         self.root.after(0, self._apply_state, state)
 
+    def update_rms(self, rms: float) -> None:
+        """Called from the audio thread — assigns only, no Tk calls."""
+        self._latest_rms = rms
+
     def _apply_state(self, state: str) -> None:
-        if state == "recording":
-            self._overlay_show("●  Recording", _COLORS["recording"])
-        elif state == "transcribing":
-            self._overlay_show("Transcribing…", _COLORS["transcribing"])
+        self._overlay_state = state
+        if state in ("recording", "transcribing"):
+            self._overlay_show(state)
         else:
+            self._latest_rms = 0.0
             self._overlay_hide()
 
-    def _overlay_show(self, text: str, color: str) -> None:
+    def _overlay_show(self, state: str) -> None:
         if self._overlay is None:
             self._overlay = tk.Toplevel(self.root)
             self._overlay.overrideredirect(True)
             self._overlay.attributes("-topmost", True)
-            self._overlay.configure(bg="#1e1e1e")
-            self._overlay_label = tk.Label(
-                self._overlay, font=("Segoe UI", 12, "bold"), bg="#1e1e1e", padx=20, pady=10
+            self._overlay.configure(bg=_OV_BG)
+            self._canvas = tk.Canvas(
+                self._overlay, width=_OVERLAY_W, height=_OVERLAY_H,
+                bg=_OV_BG, highlightthickness=0,
             )
-            self._overlay_label.pack()
-        self._overlay_label.config(text=text, fg=color)
+            self._canvas.pack()
         self._overlay.deiconify()
-        self._position(self._overlay, y_from_bottom=120)
+        self._position(self._overlay, y_from_bottom=80)
+        if not self._anim_running:
+            self._anim_running = True
+            self._animate_tick()
 
     def _overlay_hide(self) -> None:
+        self._anim_running = False
         if self._overlay is not None:
             self._overlay.withdraw()
+
+    def _animate_tick(self) -> None:
+        if not self._anim_running or self._canvas is None:
+            return
+        if self._overlay_state == "recording":
+            self._draw_recording_frame()
+        else:
+            self._draw_transcribing_frame()
+        self._overlay.after(_ANIM_MS, self._animate_tick)  # type: ignore[union-attr]
+
+    def _draw_recording_frame(self) -> None:
+        """7 bars, heights driven by microphone RMS + per-bar phase offset."""
+        rms = self._latest_rms
+        normalized = min(max(rms - 300, 0.0) / 4000.0, 1.0)
+        t = _time.monotonic()
+        canvas = self._canvas
+        assert canvas is not None
+        canvas.delete("all")
+        for i in range(_BAR_COUNT):
+            phase = i * (math.pi * 2 / _BAR_COUNT)
+            idle = 0.12 * (1.0 + math.sin(t * 2.5 + phase))
+            voice = normalized * (0.5 + 0.5 * math.sin(t * 16 + phase * 1.4))
+            target = _BAR_MIN_H + (_BAR_MAX_H - _BAR_MIN_H) * max(idle, voice)
+            self._bar_heights[i] += (target - self._bar_heights[i]) * 0.4
+            h = self._bar_heights[i]
+            x0 = _PAD_X + i * (_BAR_W + _BAR_GAP)
+            cy = _OVERLAY_H // 2
+            canvas.create_rectangle(
+                x0, int(cy - h / 2), x0 + _BAR_W, int(cy + h / 2),
+                fill="#FFFFFF", outline="",
+            )
+
+    def _draw_transcribing_frame(self) -> None:
+        """3 pulsing dots while the transcription call is in flight."""
+        t = _time.monotonic()
+        canvas = self._canvas
+        assert canvas is not None
+        canvas.delete("all")
+        start_cx = (_OVERLAY_W - (_DOT_COUNT - 1) * _DOT_SPACING) // 2
+        cy = _OVERLAY_H // 2
+        for i in range(_DOT_COUNT):
+            phase = i * (math.pi * 2 / _DOT_COUNT)
+            alpha = 0.25 + 0.75 * (0.5 + 0.5 * math.sin(t * 4.0 + phase))
+            gray = int(255 * alpha)
+            color = f"#{gray:02x}{gray:02x}{gray:02x}"
+            cx = start_cx + i * _DOT_SPACING
+            canvas.create_oval(
+                cx - _DOT_R, cy - _DOT_R, cx + _DOT_R, cy + _DOT_R,
+                fill=color, outline="",
+            )
 
     # ── silent toast ──────────────────────────────────────────────────────────
 

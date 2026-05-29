@@ -36,6 +36,7 @@ SEGMENT_MIN_MS = 4000           # never cut a segment shorter than this
 SEGMENT_MAX_MS = 15000          # force a cut even without silence
 
 OnSegment = Callable[[int, Path], None]
+OnRms = Callable[[float], None]
 
 _active: dict[str, dict] = {}
 
@@ -107,6 +108,7 @@ def _new_segment_file(rid: str, index: int) -> tuple[sf.SoundFile, Path]:
 def start_recording(
     on_segment: OnSegment | None = None,
     device: int | str | None = None,
+    on_rms: OnRms | None = None,
 ) -> str:
     RECORDINGS_DIR.mkdir(parents=True, exist_ok=True)
     recording_id = uuid4().hex
@@ -127,14 +129,18 @@ def start_recording(
         "seg_frames": 0,
         "cutter": _SegmentCutter(),
         "on_segment": on_segment,
+        "on_rms": on_rms,
     }
 
     def callback(indata: np.ndarray, frames: int, time_info, status) -> None:
         full_file.write(indata)
         entry["seg_file"].write(indata)
         entry["seg_frames"] += frames
-        if entry["cutter"].feed(_rms(indata), frames):
+        rms = _rms(indata)
+        if entry["cutter"].feed(rms, frames):
             _rotate_segment(recording_id, entry)
+        if entry["on_rms"] is not None:
+            entry["on_rms"](rms)
 
     stream = sd.InputStream(
         samplerate=SAMPLE_RATE, channels=CHANNELS, dtype=DTYPE,
