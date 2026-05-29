@@ -61,9 +61,10 @@ class App:
         self._seg_futures: dict[int, Future] = {}
         self._seg_paths: dict[int, Path] = {}
         self._recent_texts: deque[str] = deque(maxlen=5)
-        # Start hidden when key is already configured (normal launch / boot).
-        # Show the window on first run so the user can enter their API key.
-        _has_key = bool(config.resolved_api_key(self._cfg))
+        # Start hidden when the user has explicitly saved a key in Settings.
+        # Only check config file — not the env var — so a machine-level
+        # OPENAI_API_KEY doesn't suppress the first-run setup window.
+        _has_key = bool(self._cfg.get("openai_api_key", ""))
         self._ui = UI(
             self._cfg,
             on_settings_saved=self._on_settings_saved,
