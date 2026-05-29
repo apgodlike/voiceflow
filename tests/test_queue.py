@@ -58,15 +58,19 @@ def test_list_pending_returns_all_json(tmp_path):
     assert {j.recording_id for j in jobs} == {"id1", "id2"}
 
 
-def test_retry_all_excludes_maxed_attempts(tmp_path):
+def test_retry_all_only_returns_failed_jobs(tmp_path):
     queue_dir = tmp_path / "queue"
+    enqueue("pending_job", "/rec/p.ogg", queue_dir=queue_dir)   # status=pending, attempts=0
     enqueue("retry_me", "/rec/r.ogg", queue_dir=queue_dir)
+    mark_failed("retry_me", "err", queue_dir=queue_dir)          # status=failed, attempts=1
     enqueue("maxed_out", "/rec/m.ogg", queue_dir=queue_dir)
     for _ in range(3):
-        mark_failed("maxed_out", "err", queue_dir=queue_dir)
+        mark_failed("maxed_out", "err", queue_dir=queue_dir)     # attempts=3 = MAX
+
     ids = {j.recording_id for j in retry_all(queue_dir=queue_dir)}
-    assert "retry_me" in ids
-    assert "maxed_out" not in ids
+    assert "retry_me" in ids        # failed, under max → should retry
+    assert "pending_job" not in ids  # pending = currently being processed, not for sweeper
+    assert "maxed_out" not in ids   # hit MAX_ATTEMPTS → no more retries
 
 
 def test_full_round_trip(tmp_path):

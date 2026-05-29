@@ -85,7 +85,7 @@ def list_pending(queue_dir: Path = QUEUE_DIR) -> list[Job]:
 
 def retry_all(queue_dir: Path = QUEUE_DIR) -> Iterator[Job]:
     for job in list_pending(queue_dir):
-        if job.attempts < MAX_ATTEMPTS:
+        if job.status == "failed" and job.attempts < MAX_ATTEMPTS:
             yield job
 
 

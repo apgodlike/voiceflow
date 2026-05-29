@@ -156,8 +156,18 @@ class App:
         )
         self._ui.toast("Pasted previous ✓")
 
+    # Segments smaller than this are too short for the OpenAI API (~0.3 s of
+    # 16 kHz OGG). Sending them returns 400 "Audio file might be corrupted".
+    _MIN_SEGMENT_BYTES = 8_000
+
     def _on_segment(self, index: int, path: Path) -> None:
         """A segment closed mid-recording — start transcribing it now."""
+        try:
+            if path.stat().st_size < self._MIN_SEGMENT_BYTES:
+                path.unlink(missing_ok=True)
+                return
+        except OSError:
+            return
         lang = self._cfg.get("language") or None
         fut = self._executor.submit(transcriber.transcribe, path, lang)
         with self._seg_lock:
@@ -279,7 +289,16 @@ class App:
 
     # ── lifecycle ─────────────────────────────────────────────────────────────
 
+    def _adopt_orphaned_jobs(self) -> None:
+        """Pending jobs left from a previous crash were never attempted.
+        Mark them failed so retry_all() picks them up for retry."""
+        for job in q.list_pending():
+            if job.status == "pending":
+                logger.info("Adopting orphaned job %s", job.recording_id)
+                q.mark_failed(job.recording_id, "orphaned from previous session")
+
     def run(self) -> None:
+        self._adopt_orphaned_jobs()
         self._sweep_once()  # retry anything left over from a previous run
         threading.Thread(target=self._sweeper, daemon=True, name="sweeper").start()
         self._hotkey.start()
