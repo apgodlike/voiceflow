@@ -78,6 +78,7 @@ class UI:
         cfg: dict[str, Any],
         on_settings_saved: Callable[[dict[str, Any]], None],
         on_startup_toggle: Callable[[bool], None],
+        start_hidden: bool = False,
     ) -> None:
         self._cfg = cfg
         self._on_settings_saved = on_settings_saved
@@ -102,7 +103,8 @@ class UI:
 
         self._toast: tk.Toplevel | None = None
         self._build_main()
-        self.root.withdraw()  # start hidden — user opens via tray "Open VoiceFlow"
+        if start_hidden:
+            self.root.withdraw()  # tray-only on normal/boot launch
 
     # ── main window ───────────────────────────────────────────────────────────
 

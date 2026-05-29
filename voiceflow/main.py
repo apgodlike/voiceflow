@@ -61,10 +61,14 @@ class App:
         self._seg_futures: dict[int, Future] = {}
         self._seg_paths: dict[int, Path] = {}
         self._recent_texts: deque[str] = deque(maxlen=5)
+        # Start hidden when key is already configured (normal launch / boot).
+        # Show the window on first run so the user can enter their API key.
+        _has_key = bool(config.resolved_api_key(self._cfg))
         self._ui = UI(
             self._cfg,
             on_settings_saved=self._on_settings_saved,
             on_startup_toggle=self._on_startup_toggle,
+            start_hidden=_has_key,
         )
         self._tray = Tray(
             on_quit=self._quit,
@@ -305,8 +309,8 @@ class App:
         # pystray on a detached daemon thread; Tk owns the main thread below.
         self._tray.run_detached()
         if not config.resolved_api_key(self._cfg):
-            logger.info("No API key configured — opening Settings.")
-            self._ui.open_settings()
+            logger.info("No API key configured — showing setup window.")
+            self._ui.open_settings()  # window already visible (start_hidden=False)
         logger.info("VoiceFlow ready. Hold Ctrl+Alt to record, or double-tap to toggle.")
 
         self._ui.run()  # blocks on the Tk mainloop until the window is destroyed
