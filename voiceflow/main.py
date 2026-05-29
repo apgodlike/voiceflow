@@ -61,18 +61,20 @@ class App:
         self._seg_futures: dict[int, Future] = {}
         self._seg_paths: dict[int, Path] = {}
         self._recent_texts: deque[str] = deque(maxlen=5)
-        # Start hidden when the user has explicitly saved a key in Settings.
-        # Only check config file — not the env var — so a machine-level
-        # OPENAI_API_KEY doesn't suppress the first-run setup window.
+        # Fresh install = config file doesn't exist yet → show wizard.
+        # Returning user = config exists → start hidden in tray.
+        self._is_first_run = not paths.CONFIG_PATH.exists()
         _has_key = (
             bool(self._cfg.get("openai_api_key", ""))
             or self._cfg.get("backend") == "local"
         )
+        # Force window visible on first run regardless of env-level API key.
+        _start_hidden = _has_key and not self._is_first_run
         self._ui = UI(
             self._cfg,
             on_settings_saved=self._on_settings_saved,
             on_startup_toggle=self._on_startup_toggle,
-            start_hidden=_has_key,
+            start_hidden=_start_hidden,
         )
         self._tray = Tray(
             on_quit=self._quit,
@@ -113,10 +115,38 @@ class App:
                                                 model_name=model_name)
         return transcriber.transcribe(audio_path, language=language)
 
+    def _on_setup_complete(self, cfg: dict) -> None:
+        """Called by the setup wizard when the user finishes first-run setup."""
+        self._cfg.update(cfg)
+        config.save(self._cfg)
+        self._apply_config_env()
+        startup.apply(self._cfg.get("start_on_login", True))
+        self._tray.set_backend(self._cfg.get("backend", "openai"))
+        self._ui.hide()
+        self._ui.toast("VoiceFlow ready! Hold Ctrl+Alt to start recording.")
+
+    def _preload_local_model(self) -> None:
+        """Load the configured local model into RAM in the background on startup."""
+        model_name = self._cfg.get("local_model", "base")
+
+        def _load() -> None:
+            try:
+                from voiceflow import transcriber_local
+                if not transcriber_local.is_loaded():
+                    logger.info("Preloading local model '%s'…", model_name)
+                    transcriber_local._load_model(model_name)
+                    logger.info("Local model '%s' ready.", model_name)
+            except Exception as exc:
+                logger.warning("Local model preload failed: %s", exc)
+
+        threading.Thread(target=_load, daemon=True, name="model-preload").start()
+
     def _on_settings_saved(self, cfg: dict) -> None:
         config.save(cfg)
         self._apply_config_env()
         startup.apply(cfg.get("start_on_login", True))
+        if cfg.get("backend") == "local":
+            self._preload_local_model()
 
     def _on_startup_toggle(self, enabled: bool) -> None:
         self._cfg["start_on_login"] = enabled
@@ -345,9 +375,14 @@ class App:
         self._hotkey.start()
         # pystray on a detached daemon thread; Tk owns the main thread below.
         self._tray.run_detached()
-        if not config.resolved_api_key(self._cfg):
-            logger.info("No API key configured — showing setup window.")
-            self._ui.open_settings()  # window already visible (start_hidden=False)
+        if self._is_first_run:
+            logger.info("First run — showing setup wizard.")
+            self._ui.open_setup_wizard(on_complete=self._on_setup_complete)
+        elif self._cfg.get("backend") == "local":
+            self._preload_local_model()
+        elif not config.resolved_api_key(self._cfg):
+            logger.info("No API key configured — showing settings.")
+            self._ui.open_settings()
         logger.info("VoiceFlow ready. Hold Ctrl+Alt to record, or double-tap to toggle.")
 
         self._ui.run()  # blocks on the Tk mainloop until the window is destroyed

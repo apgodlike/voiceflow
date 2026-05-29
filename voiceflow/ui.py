@@ -22,6 +22,7 @@ logger = logging.getLogger("voiceflow.ui")
 _COLORS = {"recording": "#e03030", "transcribing": "#e0a000", "idle": "#808080"}
 _MODELS = ["gpt-4o-mini-transcribe", "gpt-4o-transcribe"]
 _SYSTEM_DEFAULT_DEV = "System default"
+_LOCAL_MODEL_SIZES = ["tiny", "base", "small", "medium", "large"]
 
 # ── animated overlay geometry ──────────────────────────────────────────────────
 _OV_TRANSPARENT = "#000001"   # Windows transparentcolor sentinel — these pixels vanish
@@ -308,15 +309,117 @@ class UI:
         tab_api = ttk.Frame(nb, padding=12)
         nb.add(tab_api, text="API")
 
+        backend_var = tk.StringVar(value=self._cfg.get("backend", "openai"))
         key_var = tk.StringVar(value=self._cfg.get("openai_api_key", ""))
         model_var = tk.StringVar(value=self._cfg.get("model", _MODELS[0]))
+        local_model_var = tk.StringVar(value=self._cfg.get("local_model", "base"))
 
-        ttk.Label(tab_api, text="OpenAI API key").pack(anchor="w")
-        ttk.Entry(tab_api, textvariable=key_var, show="*", width=46).pack(fill="x", pady=(2, 10))
-        ttk.Label(tab_api, text="Transcription model").pack(anchor="w")
-        ttk.Combobox(tab_api, textvariable=model_var, values=_MODELS, state="readonly", width=32).pack(
+        ttk.Label(tab_api, text="Transcription backend").pack(anchor="w")
+        _rb = ttk.Frame(tab_api)
+        _rb.pack(anchor="w", pady=(2, 8))
+        ttk.Radiobutton(_rb, text="Cloud — OpenAI", variable=backend_var, value="openai",
+                        command=lambda: _switch_api()).pack(side="left")
+        ttk.Radiobutton(_rb, text="Local — Whisper (free, private)", variable=backend_var,
+                        value="local", command=lambda: _switch_api()).pack(side="left", padx=(16, 0))
+        ttk.Separator(tab_api, orient="horizontal").pack(fill="x", pady=(0, 8))
+
+        # OpenAI section
+        _openai_sec = ttk.Frame(tab_api)
+        ttk.Label(_openai_sec, text="OpenAI API key").pack(anchor="w")
+        ttk.Entry(_openai_sec, textvariable=key_var, show="*", width=46).pack(fill="x", pady=(2, 10))
+        ttk.Label(_openai_sec, text="Transcription model").pack(anchor="w")
+        ttk.Combobox(_openai_sec, textvariable=model_var, values=_MODELS, state="readonly", width=32).pack(
             anchor="w", pady=(2, 0)
         )
+
+        # Local section
+        _local_sec = ttk.Frame(tab_api)
+        _lm_row = ttk.Frame(_local_sec)
+        _lm_row.pack(anchor="w", pady=(0, 4))
+        ttk.Label(_lm_row, text="Model:").pack(side="left")
+        _lm_combo = ttk.Combobox(_lm_row, textvariable=local_model_var,
+                                 values=_LOCAL_MODEL_SIZES, state="readonly", width=10)
+        _lm_combo.pack(side="left", padx=(6, 0))
+        _lm_size_lbl = ttk.Label(_lm_row, foreground="#666")
+        _lm_size_lbl.pack(side="left", padx=8)
+        _lm_status_lbl = ttk.Label(_local_sec)
+        _lm_status_lbl.pack(anchor="w", pady=(0, 4))
+        _lm_dl_btn = ttk.Button(_local_sec, text="Download model",
+                                command=lambda: _start_local_dl())
+        _lm_dl_btn.pack(anchor="w")
+        _lm_prog_frame = ttk.Frame(_local_sec)
+        _lm_prog = ttk.Progressbar(_lm_prog_frame, mode="determinate", length=300)
+        _lm_prog.pack(fill="x")
+        _lm_prog_lbl = ttk.Label(_lm_prog_frame, text="", foreground="#666")
+        _lm_prog_lbl.pack(anchor="w")
+        _lm_err_lbl = ttk.Label(_local_sec, foreground="#cc0000", wraplength=360)
+
+        def _refresh_lm(*_):
+            from voiceflow import model_manager
+            name = local_model_var.get()
+            _lm_size_lbl.config(
+                text=f"· {model_manager.MODEL_SIZES.get(name,'?')} — {model_manager.MODEL_DESCS.get(name,'')}"
+            )
+            if model_manager.is_cached(name):
+                _lm_status_lbl.config(text="✓ Downloaded", foreground="#2a8a2a")
+                _lm_dl_btn.config(text="Re-download")
+            else:
+                _lm_status_lbl.config(text="Not downloaded yet", foreground="#cc0000")
+                _lm_dl_btn.config(text="Download model")
+
+        _lm_combo.bind("<<ComboboxSelected>>", _refresh_lm)
+
+        def _start_local_dl():
+            import threading as _th
+            name = local_model_var.get()
+            _lm_dl_btn.config(state="disabled")
+            _lm_combo.config(state="disabled")
+            _lm_err_lbl.pack_forget()
+            _lm_prog_frame.pack(fill="x", pady=(4, 0))
+            _lm_prog.config(value=0, maximum=1, mode="determinate")
+            _lm_prog_lbl.config(text="Connecting...")
+            _lm_status_lbl.config(text="Downloading...", foreground="#666")
+
+            def _do():
+                try:
+                    from voiceflow import model_manager
+
+                    def _prog(done: int, total: int) -> None:
+                        def _u():
+                            _lm_prog.config(maximum=total, value=done)
+                            _lm_prog_lbl.config(text=f"{done}/{total} files")
+                        win.after(0, _u)
+
+                    model_manager.download(name, _prog)
+
+                    def _done():
+                        _lm_prog_frame.pack_forget()
+                        _lm_status_lbl.config(text="✓ Downloaded", foreground="#2a8a2a")
+                        _lm_dl_btn.config(state="normal", text="Re-download")
+                        _lm_combo.config(state="readonly")
+                    win.after(0, _done)
+                except Exception as exc:
+                    def _err(e=exc):
+                        _lm_prog_frame.pack_forget()
+                        _lm_err_lbl.config(text=f"Download failed: {e}")
+                        _lm_err_lbl.pack(anchor="w", pady=(4, 0))
+                        _lm_status_lbl.config(text="Download failed", foreground="#cc0000")
+                        _lm_dl_btn.config(state="normal")
+                        _lm_combo.config(state="readonly")
+                    win.after(0, _err)
+
+            _th.Thread(target=_do, daemon=True, name="model-dl-settings").start()
+
+        def _switch_api():
+            if backend_var.get() == "openai":
+                _local_sec.pack_forget()
+                _openai_sec.pack(fill="x")
+            else:
+                _openai_sec.pack_forget()
+                _local_sec.pack(fill="x")
+                _refresh_lm()
+
+        _switch_api()  # show correct section on open
 
         # ── Tab: Recording ────────────────────────────────────────────────────
         tab_rec = ttk.Frame(nb, padding=12)
@@ -406,6 +509,18 @@ class UI:
         btns.grid(row=3, column=0, sticky="we", pady=(8, 0))
 
         def save() -> None:
+            if backend_var.get() == "local":
+                from voiceflow import model_manager
+                if not model_manager.is_cached(local_model_var.get()):
+                    messagebox.showwarning(
+                        "Model not downloaded",
+                        f"The '{local_model_var.get()}' model hasn't been downloaded yet.\n"
+                        "Please click 'Download model' in the API tab before saving.",
+                        parent=win,
+                    )
+                    nb.select(tab_api)
+                    return
+
             raw_dict = dict_text.get("1.0", "end").strip()
             try:
                 dict_val = json.loads(raw_dict or "{}")
@@ -426,6 +541,8 @@ class UI:
             input_device = None if chosen == -1 else chosen
 
             self._cfg.update(
+                backend=backend_var.get(),
+                local_model=local_model_var.get(),
                 openai_api_key=key_var.get().strip(),
                 model=model_var.get(),
                 language=lang_var.get().strip(),
@@ -446,6 +563,207 @@ class UI:
 
         ttk.Button(btns, text="Cancel", command=win.destroy).pack(side="right", padx=(8, 0))
         ttk.Button(btns, text="Save", command=save).pack(side="right")
+
+    # ── setup wizard (first-run) ──────────────────────────────────────────────
+
+    def open_setup_wizard(self, on_complete: Callable[[dict], None]) -> None:
+        self.root.after(0, self._open_setup_wizard, on_complete)
+
+    def _open_setup_wizard(self, on_complete: Callable[[dict], None]) -> None:  # noqa: C901
+        import threading as _th
+        win = tk.Toplevel(self.root)
+        win.title("VoiceFlow Setup")
+        win.geometry("480x360")
+        win.resizable(False, False)
+        win.transient(self.root)
+        win.grab_set()
+        win.protocol("WM_DELETE_WINDOW", lambda: None)  # must complete wizard
+
+        cfg_out: dict = {}
+        backend_var = tk.StringVar(value="openai")
+
+        def _show(frame: ttk.Frame) -> None:
+            for f in (p_choose, p_openai, p_local):
+                f.pack_forget()
+            frame.pack(fill="both", expand=True)
+
+        # ── Page 1: choose backend ─────────────────────────────────────
+        p_choose = ttk.Frame(win, padding=24)
+
+        ttk.Label(p_choose, text="Welcome to VoiceFlow",
+                  font=("Segoe UI", 14, "bold")).pack(anchor="w")
+        ttk.Label(p_choose,
+                  text="How would you like to transcribe your voice?").pack(anchor="w", pady=(4, 16))
+
+        for _val, _title, _sub in [
+            ("openai", "Cloud — OpenAI",
+             "Fast & accurate. Needs an API key. ~$0.006/min."),
+            ("local", "Local — Whisper  (free, private)",
+             "Runs on your PC. No API key needed.\nOne-time model download (75 MB – 3 GB)."),
+        ]:
+            _row = ttk.Frame(p_choose)
+            _row.pack(fill="x", pady=4)
+            ttk.Radiobutton(_row, variable=backend_var, value=_val).pack(
+                side="left", anchor="n", pady=2)
+            _txt = ttk.Frame(_row)
+            _txt.pack(side="left", padx=8)
+            ttk.Label(_txt, text=_title, font=("Segoe UI", 10, "bold")).pack(anchor="w")
+            ttk.Label(_txt, text=_sub, foreground="#666", justify="left").pack(anchor="w")
+
+        def _on_continue():
+            if backend_var.get() == "openai":
+                _show(p_openai)
+            else:
+                _show(p_local)
+                _refresh_local()
+
+        _nav1 = ttk.Frame(p_choose)
+        _nav1.pack(side="bottom", fill="x")
+        ttk.Button(_nav1, text="Continue →", command=_on_continue).pack(side="right")
+
+        # ── Page 2a: OpenAI key ────────────────────────────────────────
+        p_openai = ttk.Frame(win, padding=24)
+
+        ttk.Label(p_openai, text="OpenAI API key",
+                  font=("Segoe UI", 12, "bold")).pack(anchor="w")
+        ttk.Label(p_openai, text="Stored locally. Sent only to OpenAI.",
+                  foreground="#666").pack(anchor="w", pady=(2, 12))
+        key_var = tk.StringVar()
+        ttk.Entry(p_openai, textvariable=key_var, show="*", width=44).pack(fill="x")
+        ttk.Label(p_openai, text="Get your key at platform.openai.com",
+                  foreground="#0066cc").pack(anchor="w", pady=(4, 0))
+
+        def _finish_openai():
+            key = key_var.get().strip()
+            if not key:
+                messagebox.showwarning(
+                    "API key required", "Please enter your OpenAI API key.", parent=win)
+                return
+            cfg_out.update(backend="openai", openai_api_key=key)
+            win.destroy()
+            on_complete(cfg_out)
+
+        _nav2a = ttk.Frame(p_openai)
+        _nav2a.pack(side="bottom", fill="x")
+        ttk.Button(_nav2a, text="← Back", command=lambda: _show(p_choose)).pack(side="left")
+        ttk.Button(_nav2a, text="Finish", command=_finish_openai).pack(side="right")
+
+        # ── Page 2b: local model download ──────────────────────────────
+        p_local = ttk.Frame(win, padding=24)
+
+        ttk.Label(p_local, text="Choose Whisper model",
+                  font=("Segoe UI", 12, "bold")).pack(anchor="w")
+
+        _lm_pick_row = ttk.Frame(p_local)
+        _lm_pick_row.pack(anchor="w", pady=(8, 4))
+        _local_model_var = tk.StringVar(value="base")
+        _lm_cb = ttk.Combobox(_lm_pick_row, textvariable=_local_model_var,
+                              values=_LOCAL_MODEL_SIZES, state="readonly", width=10)
+        _lm_cb.pack(side="left")
+        _lm_desc = ttk.Label(_lm_pick_row, foreground="#666")
+        _lm_desc.pack(side="left", padx=8)
+
+        _lm_stat = ttk.Label(p_local)
+        _lm_stat.pack(anchor="w", pady=(0, 6))
+
+        _lm_dl_btn = ttk.Button(p_local, text="Download model",
+                                command=lambda: _start_dl())
+        _lm_dl_btn.pack(anchor="w")
+
+        _lm_pf = ttk.Frame(p_local)
+        _lm_pb = ttk.Progressbar(_lm_pf, length=380, mode="determinate")
+        _lm_pb.pack(fill="x")
+        _lm_plbl = ttk.Label(_lm_pf, text="", foreground="#666")
+        _lm_plbl.pack(anchor="w")
+
+        _lm_err = ttk.Label(p_local, foreground="#cc0000", wraplength=400)
+
+        def _refresh_local(*_) -> None:
+            from voiceflow import model_manager
+            name = _local_model_var.get()
+            _lm_desc.config(
+                text=f"· {model_manager.MODEL_SIZES.get(name,'?')} "
+                     f"— {model_manager.MODEL_DESCS.get(name,'')}"
+            )
+            if model_manager.is_cached(name):
+                _lm_stat.config(text="✓ Already downloaded", foreground="#2a8a2a")
+                _lm_dl_btn.config(text="Re-download")
+                _finish_btn.config(state="normal")
+            else:
+                _lm_stat.config(
+                    text="Not downloaded yet — click Download below.", foreground="#999")
+                _lm_dl_btn.config(text="Download model")
+                _finish_btn.config(state="disabled")
+
+        _lm_cb.bind("<<ComboboxSelected>>", _refresh_local)
+
+        def _start_dl() -> None:
+            name = _local_model_var.get()
+            _lm_dl_btn.config(state="disabled")
+            _lm_cb.config(state="disabled")
+            _lm_err.pack_forget()
+            _lm_pf.pack(fill="x", pady=(4, 0))
+            _lm_pb.config(value=0, maximum=1, mode="determinate")
+            _lm_plbl.config(text="Connecting to download server...")
+            _lm_stat.config(text="Downloading...", foreground="#666")
+            _finish_btn.config(state="disabled")
+
+            def _do() -> None:
+                try:
+                    from voiceflow import model_manager
+
+                    def _prog(done: int, total: int) -> None:
+                        def _u():
+                            _lm_pb.config(maximum=total, value=done)
+                            _lm_plbl.config(text=f"Downloading... {done}/{total} files")
+                        win.after(0, _u)
+
+                    model_manager.download(name, _prog)
+
+                    def _switch_to_loading():
+                        _lm_pb.config(mode="indeterminate")
+                        _lm_pb.start(15)
+                        _lm_plbl.config(text="Loading model into memory...")
+                    win.after(0, _switch_to_loading)
+
+                    from voiceflow import transcriber_local
+                    transcriber_local._load_model(name)
+
+                    def _done():
+                        _lm_pb.stop()
+                        _lm_pf.pack_forget()
+                        _lm_stat.config(text="✓ Ready!", foreground="#2a8a2a")
+                        _lm_dl_btn.config(state="normal", text="Re-download")
+                        _lm_cb.config(state="readonly")
+                        _finish_btn.config(state="normal")
+                    win.after(0, _done)
+
+                except Exception as exc:
+                    def _err(e=exc):
+                        _lm_pb.stop()
+                        _lm_pf.pack_forget()
+                        _lm_err.config(text=f"Download failed: {e}")
+                        _lm_err.pack(anchor="w", pady=(4, 0))
+                        _lm_stat.config(text="Download failed", foreground="#cc0000")
+                        _lm_dl_btn.config(state="normal")
+                        _lm_cb.config(state="readonly")
+                    win.after(0, _err)
+
+            _th.Thread(target=_do, daemon=True, name="wizard-model-dl").start()
+
+        def _finish_local():
+            cfg_out.update(backend="local", local_model=_local_model_var.get())
+            win.destroy()
+            on_complete(cfg_out)
+
+        _nav2b = ttk.Frame(p_local)
+        _nav2b.pack(side="bottom", fill="x")
+        ttk.Button(_nav2b, text="← Back", command=lambda: _show(p_choose)).pack(side="left")
+        _finish_btn = ttk.Button(_nav2b, text="Finish", command=_finish_local, state="disabled")
+        _finish_btn.pack(side="right")
+
+        _show(p_choose)
+        win.focus_set()
 
     # ── window visibility + lifecycle ──────────────────────────────────────────
 
