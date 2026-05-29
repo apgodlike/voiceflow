@@ -58,6 +58,7 @@ class App:
         self._executor = ThreadPoolExecutor(max_workers=MAX_WORKERS)
         # Per-recording segment fast-path state (one recording active at a time).
         self._seg_lock = threading.Lock()
+        self._stop_lock = threading.Lock()
         self._seg_futures: dict[int, Future] = {}
         self._seg_paths: dict[int, Path] = {}
         self._recent_texts: deque[str] = deque(maxlen=5)
@@ -189,10 +190,15 @@ class App:
         """
         self._set_state("transcribing")
         try:
-            parts = [
-                (futures[i].result(timeout=SEGMENT_RESULT_TIMEOUT_SEC) or "")
-                for i in sorted(futures)
-            ]
+            try:
+                parts = [
+                    (futures[i].result(timeout=SEGMENT_RESULT_TIMEOUT_SEC) or "")
+                    for i in sorted(futures)
+                ]
+            except Exception as exc:
+                logger.warning("Segment fast-path failed for %s, using full file: %s", rid, exc)
+                self._process_job(rid, full_path)
+                return
             raw = " ".join(p for p in parts if p).strip()
             if not raw:
                 q.mark_success(rid)  # nothing said — drop the recording
@@ -205,9 +211,6 @@ class App:
             )
             q.mark_success(rid)
             self._on_paste_success(cleaned)
-        except Exception as exc:
-            logger.warning("Segment fast-path failed for %s, using full file: %s", rid, exc)
-            self._process_job(rid, full_path)
         finally:
             self._cleanup_segments(seg_paths)
             self._set_state("idle")
@@ -255,11 +258,12 @@ class App:
         self._start_max_timer()
 
     def _on_stop(self) -> None:
-        rid = self._current_rid
-        if rid is None:
-            return
-        self._cancel_max_timer()
-        self._current_rid = None
+        with self._stop_lock:
+            rid = self._current_rid
+            if rid is None:
+                return
+            self._cancel_max_timer()
+            self._current_rid = None
         full = recorder.stop_recording(rid)  # fires on_segment for the final segment
         logger.info("Recording stopped: %s", rid)
         with self._seg_lock:

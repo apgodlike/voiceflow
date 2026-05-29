@@ -6,6 +6,19 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-05-29
+
+### Fixed
+- Double-paste bug: the segment fast-path fallback in `_finalize_job` used an
+  overbroad `try/except` that wrapped the paste itself. If `q.mark_success()` or
+  `_on_paste_success()` raised after a successful paste, the `except` block
+  triggered `_process_job()`, which transcribed and pasted again. The fallback
+  now only catches segment `.result()` failures.
+- Race condition in `_on_stop`: the max-duration timer thread and the hotkey
+  thread could both read `_current_rid` as non-None before either set it to
+  `None`, leading to two concurrent `_finalize_job` threads. A `_stop_lock`
+  makes the read-check-clear of `_current_rid` atomic.
+
 ## [0.1.2] - 2026-05-29
 
 ### Fixed
