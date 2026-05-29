@@ -25,16 +25,18 @@ def _make_icon(color: str) -> Image.Image:
 
 class Tray:
     def __init__(self, on_quit=None, on_retry=None, on_open=None, on_settings=None,
-                 on_paste_previous=None) -> None:
+                 on_paste_previous=None, on_backend_toggle=None) -> None:
         self._state: Literal["idle", "recording", "transcribing"] = "idle"
         self._failed_count = 0
         self._has_previous = False
+        self._backend: str = "openai"
         self._lock = threading.Lock()
         self._on_quit_cb = on_quit
         self._on_retry_cb = on_retry
         self._on_open_cb = on_open
         self._on_settings_cb = on_settings
         self._on_paste_previous_cb = on_paste_previous
+        self._on_backend_toggle_cb = on_backend_toggle
         self._icon = pystray.Icon(
             "VoiceFlow",
             _make_icon(_ICON_COLORS["idle"]),
@@ -57,6 +59,10 @@ class Tray:
     def set_has_previous(self, has_previous: bool) -> None:
         with self._lock:
             self._has_previous = has_previous
+
+    def set_backend(self, backend: str) -> None:
+        with self._lock:
+            self._backend = backend
 
     def set_failed_count(self, n: int) -> None:
         with self._lock:
@@ -89,12 +95,14 @@ class Tray:
             state = self._state
             failed = self._failed_count
             has_prev = self._has_previous
+            backend = self._backend
 
         items: list[pystray.MenuItem] = [
             pystray.MenuItem(f"Status: {state}", None, enabled=False),
             pystray.MenuItem("Open VoiceFlow", self._on_open, default=True),
             pystray.MenuItem("Paste Previous", self._on_paste_previous, enabled=has_prev),
             pystray.MenuItem("Settings…", self._on_settings),
+            pystray.MenuItem(f"Backend: {backend} → switch", self._on_backend_toggle),
             pystray.Menu.SEPARATOR,
         ]
 
@@ -120,6 +128,10 @@ class Tray:
     def _on_settings(self, icon, item) -> None:
         if self._on_settings_cb:
             self._on_settings_cb()
+
+    def _on_backend_toggle(self, icon, item) -> None:
+        if self._on_backend_toggle_cb:
+            self._on_backend_toggle_cb()
 
     def _on_quit(self, icon, item) -> None:
         if self._on_quit_cb:

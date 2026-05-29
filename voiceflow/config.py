@@ -29,6 +29,8 @@ DEFAULTS: dict[str, Any] = {
     "language": "",             # ISO-639-1 hint for transcription (e.g. "en", "hi"); empty = auto
     "paste_mode": "clipboard",  # "clipboard" (Ctrl+V) or "type" (character-by-character)
     "input_device": None,       # sounddevice input device index; None = system default
+    "backend": "openai",        # "openai" | "local" — transcription backend
+    "local_model": "base",      # faster-whisper model: tiny, base, small, medium, large
 }
 
 
@@ -101,6 +103,18 @@ def validate(cfg: dict[str, Any]) -> list[str]:
     language = cfg.get("language", "")
     if language and not isinstance(language, str):
         warnings.append("'language' must be a string (ISO-639-1 code, e.g. \"en\") or empty string.")
+
+    backend = cfg.get("backend", "openai")
+    if backend not in ("openai", "local"):
+        warnings.append(
+            f"'backend' must be \"openai\" or \"local\"; got {backend!r}. Falling back to openai."
+        )
+
+    local_model = cfg.get("local_model", "base")
+    if local_model not in ("tiny", "base", "small", "medium", "large"):
+        warnings.append(
+            f"'local_model' must be one of tiny/base/small/medium/large; got {local_model!r}."
+        )
 
     return warnings
 

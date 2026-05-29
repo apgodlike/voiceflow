@@ -64,7 +64,10 @@ class App:
         # Start hidden when the user has explicitly saved a key in Settings.
         # Only check config file — not the env var — so a machine-level
         # OPENAI_API_KEY doesn't suppress the first-run setup window.
-        _has_key = bool(self._cfg.get("openai_api_key", ""))
+        _has_key = (
+            bool(self._cfg.get("openai_api_key", ""))
+            or self._cfg.get("backend") == "local"
+        )
         self._ui = UI(
             self._cfg,
             on_settings_saved=self._on_settings_saved,
@@ -77,7 +80,9 @@ class App:
             on_open=self._ui.show_window,
             on_settings=self._ui.open_settings,
             on_paste_previous=self._paste_previous,
+            on_backend_toggle=self._toggle_backend,
         )
+        self._tray.set_backend(self._cfg.get("backend", "openai"))
         self._hotkey = HotkeyController(on_start=self._on_start, on_stop=self._on_stop)
 
     # ── config ────────────────────────────────────────────────────────────────
@@ -89,6 +94,24 @@ class App:
             os.environ["OPENAI_API_KEY"] = key
         os.environ["VOICEFLOW_MODEL"] = config.resolved_model(self._cfg)
         transcriber.reset_client()  # key/model may have changed — rebuild lazily
+        if self._cfg.get("backend", "openai") == "openai":
+            try:
+                from voiceflow import transcriber_local
+                transcriber_local.reset_model()
+            except ImportError:
+                pass
+
+    def _transcribe(self, audio_path: Path, language: str | None = None) -> str:
+        """Dispatch transcription to openai or local backend per config."""
+        backend = self._cfg.get("backend", "openai")
+        if backend == "local":
+            from voiceflow import transcriber_local
+            model_name = self._cfg.get("local_model", "base")
+            if not transcriber_local.is_loaded():
+                self._ui.toast(f"Loading local Whisper model '{model_name}'…")
+            return transcriber_local.transcribe(audio_path, language=language,
+                                                model_name=model_name)
+        return transcriber.transcribe(audio_path, language=language)
 
     def _on_settings_saved(self, cfg: dict) -> None:
         config.save(cfg)
@@ -99,6 +122,19 @@ class App:
         self._cfg["start_on_login"] = enabled
         config.save(self._cfg)
         startup.apply(enabled)
+
+    def _toggle_backend(self) -> None:
+        current = self._cfg.get("backend", "openai")
+        new_backend = "local" if current == "openai" else "openai"
+        self._cfg["backend"] = new_backend
+        config.save(self._cfg)
+        self._apply_config_env()
+        self._tray.set_backend(new_backend)
+        if new_backend == "local":
+            model = self._cfg.get("local_model", "base")
+            self._ui.toast(f"Backend → local ({model})")
+        else:
+            self._ui.toast("Backend → openai")
 
     def _set_state(self, state: str) -> None:
         self._tray.set_state(state)
@@ -114,7 +150,7 @@ class App:
         """
         self._set_state("transcribing")
         try:
-            raw = transcriber.transcribe(audio_path, language=self._cfg.get("language") or None)
+            raw = self._transcribe(audio_path, language=self._cfg.get("language") or None)
             cleaned = self._clean(raw)
             paster.paste(
                 cleaned,
@@ -174,7 +210,7 @@ class App:
         except OSError:
             return
         lang = self._cfg.get("language") or None
-        fut = self._executor.submit(transcriber.transcribe, path, lang)
+        fut = self._executor.submit(self._transcribe, path, lang)
         with self._seg_lock:
             self._seg_futures[index] = fut
             self._seg_paths[index] = path

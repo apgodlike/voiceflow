@@ -4,7 +4,11 @@
 # Native libs (PortAudio via sounddevice, libsndfile via soundfile) are NOT plain
 # Python imports, so they must be collected explicitly or the exe crashes at
 # runtime on a machine without them. Always test the result on a Python-free box.
-from PyInstaller.utils.hooks import collect_dynamic_libs, collect_data_files
+#
+# Local Whisper backend (optional): faster-whisper, ctranslate2, av, tokenizers,
+# huggingface_hub are bundled so users can toggle to local transcription without
+# a separate install. ~100-150 MB overhead. Model weights download on first use.
+from PyInstaller.utils.hooks import collect_dynamic_libs, collect_data_files, collect_all
 
 binaries = collect_dynamic_libs("soundfile") + collect_dynamic_libs("sounddevice")
 datas = (
@@ -13,6 +17,13 @@ datas = (
     + [("assets/icon.ico", "assets")]
 )
 hiddenimports = ["pystray._win32"]
+
+# faster-whisper local backend — collect all four dependency layers
+for _pkg in ("faster_whisper", "ctranslate2", "av", "tokenizers", "huggingface_hub"):
+    _d, _b, _h = collect_all(_pkg)
+    datas += _d
+    binaries += _b
+    hiddenimports += _h
 
 a = Analysis(
     ["run.py"],
