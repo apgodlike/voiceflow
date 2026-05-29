@@ -24,21 +24,31 @@ _MODELS = ["gpt-4o-mini-transcribe", "gpt-4o-transcribe"]
 _SYSTEM_DEFAULT_DEV = "System default"
 
 # ── animated overlay geometry ──────────────────────────────────────────────────
-_OV_BG = "#1a1a1a"
-_BAR_COUNT = 7
-_BAR_W = 4
-_BAR_GAP = 5
-_BARS_W = _BAR_COUNT * _BAR_W + (_BAR_COUNT - 1) * _BAR_GAP  # 58 px
-_PAD_X = 13
-_OVERLAY_W = _BARS_W + _PAD_X * 2   # 84 px
-_OVERLAY_H = 40
-_BAR_MAX_H = 26
+_OV_TRANSPARENT = "#000001"   # Windows transparentcolor sentinel — these pixels vanish
+_OV_PILL = "#1c1c1e"          # pill fill (dark, near-black)
+
+_BAR_COUNT = 9                # odd number → clean center bar
+_BAR_W = 3
+_BAR_GAP = 4
+_BARS_W = _BAR_COUNT * _BAR_W + (_BAR_COUNT - 1) * _BAR_GAP  # 27+32 = 59 px
+_OVERLAY_H = 44
+_OVERLAY_W = 110              # wide enough for pill proportions
+_PAD_X = (_OVERLAY_W - _BARS_W) // 2                          # center bars in pill
+_BAR_MAX_H = 28               # center bar max height
 _BAR_MIN_H = 3
-_ANIM_MS = 40                        # 25 fps
+_ANIM_MS = 40                 # 25 fps
 
 _DOT_COUNT = 3
-_DOT_R = 5                           # dot radius
-_DOT_SPACING = 18                    # center-to-center
+_DOT_R = 5
+_DOT_SPACING = 20             # center-to-center
+
+
+def _draw_pill_bg(canvas: tk.Canvas, w: int, h: int, fill: str) -> None:
+    """Paint a fully-rounded capsule covering (0,0)→(w,h) on canvas."""
+    r = h // 2
+    canvas.create_oval(0, 0, 2 * r, h, fill=fill, outline="")
+    canvas.create_oval(w - 2 * r, 0, w, h, fill=fill, outline="")
+    canvas.create_rectangle(r, 0, w - r, h, fill=fill, outline="")
 
 
 def _query_input_devices() -> list[tuple[int, str]]:
@@ -91,7 +101,7 @@ class UI:
         self._overlay_state: str = "idle"
         self._anim_running: bool = False
         self._latest_rms: float = 0.0
-        self._bar_heights: list[float] = [float(_BAR_MIN_H)] * _BAR_COUNT
+        self._bar_heights: list[float] = [float(_BAR_MIN_H)] * _BAR_COUNT  # size = _BAR_COUNT
 
         self._toast: tk.Toplevel | None = None
         self._build_main()
@@ -144,12 +154,19 @@ class UI:
             self._overlay = tk.Toplevel(self.root)
             self._overlay.overrideredirect(True)
             self._overlay.attributes("-topmost", True)
-            self._overlay.configure(bg=_OV_BG)
+            self._overlay.configure(bg=_OV_TRANSPARENT)
+            # Make transparent key pixels invisible (rounded pill corners vanish)
+            try:
+                self._overlay.attributes("-transparentcolor", _OV_TRANSPARENT)
+            except tk.TclError:
+                pass  # non-Windows fallback — still works, just square corners
             self._canvas = tk.Canvas(
                 self._overlay, width=_OVERLAY_W, height=_OVERLAY_H,
-                bg=_OV_BG, highlightthickness=0,
+                bg=_OV_TRANSPARENT, highlightthickness=0,
             )
             self._canvas.pack()
+            # Pill background is permanent — drawn once, never cleared
+            _draw_pill_bg(self._canvas, _OVERLAY_W, _OVERLAY_H, _OV_PILL)
         self._overlay.deiconify()
         self._position(self._overlay, y_from_bottom=80)
         if not self._anim_running:
@@ -171,25 +188,43 @@ class UI:
         self._overlay.after(_ANIM_MS, self._animate_tick)  # type: ignore[union-attr]
 
     def _draw_recording_frame(self) -> None:
-        """7 bars, heights driven by microphone RMS + per-bar phase offset."""
+        """Bell-curve waveform: center bars tallest, outer bars shorter.
+
+        Each bar's max amplitude is scaled by a Gaussian envelope centred on
+        the middle bar. The voice component adds energy on top; idle keeps a
+        low breathing motion even in silence so the indicator looks alive.
+        """
         rms = self._latest_rms
         normalized = min(max(rms - 300, 0.0) / 4000.0, 1.0)
         t = _time.monotonic()
         canvas = self._canvas
         assert canvas is not None
-        canvas.delete("all")
+        canvas.delete("anim")  # clear bars only — pill background stays
+        center = (_BAR_COUNT - 1) / 2.0
+        cy = _OVERLAY_H // 2
         for i in range(_BAR_COUNT):
-            phase = i * (math.pi * 2 / _BAR_COUNT)
-            idle = 0.12 * (1.0 + math.sin(t * 2.5 + phase))
-            voice = normalized * (0.5 + 0.5 * math.sin(t * 16 + phase * 1.4))
-            target = _BAR_MIN_H + (_BAR_MAX_H - _BAR_MIN_H) * max(idle, voice)
-            self._bar_heights[i] += (target - self._bar_heights[i]) * 0.4
+            # Gaussian envelope: 1.0 at center, ~0.18 at edges (sigma tuned to taste)
+            dist = abs(i - center) / center
+            envelope = math.exp(-dist * dist * 1.6)
+
+            # Small symmetric phase offset — natural micro-variation, not a sweep
+            phase = (i - center) * 0.35
+
+            # Idle: gentle slow breathing shaped by envelope
+            idle = envelope * 0.14 * (1.0 + math.sin(t * 2.2 + phase))
+
+            # Voice: fast reaction shaped by envelope (center always wins)
+            voice = normalized * envelope * (0.65 + 0.35 * math.sin(t * 14.0 + phase))
+
+            strength = max(idle, voice)
+            target = _BAR_MIN_H + (_BAR_MAX_H - _BAR_MIN_H) * strength
+            self._bar_heights[i] += (target - self._bar_heights[i]) * 0.45
             h = self._bar_heights[i]
+
             x0 = _PAD_X + i * (_BAR_W + _BAR_GAP)
-            cy = _OVERLAY_H // 2
             canvas.create_rectangle(
                 x0, int(cy - h / 2), x0 + _BAR_W, int(cy + h / 2),
-                fill="#FFFFFF", outline="",
+                fill="#FFFFFF", outline="", tags="anim",
             )
 
     def _draw_transcribing_frame(self) -> None:
@@ -197,7 +232,7 @@ class UI:
         t = _time.monotonic()
         canvas = self._canvas
         assert canvas is not None
-        canvas.delete("all")
+        canvas.delete("anim")
         start_cx = (_OVERLAY_W - (_DOT_COUNT - 1) * _DOT_SPACING) // 2
         cy = _OVERLAY_H // 2
         for i in range(_DOT_COUNT):
@@ -208,7 +243,7 @@ class UI:
             cx = start_cx + i * _DOT_SPACING
             canvas.create_oval(
                 cx - _DOT_R, cy - _DOT_R, cx + _DOT_R, cy + _DOT_R,
-                fill=color, outline="",
+                fill=color, outline="", tags="anim",
             )
 
     # ── silent toast ──────────────────────────────────────────────────────────
