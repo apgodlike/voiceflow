@@ -85,6 +85,8 @@ class UI:
         self._on_startup_toggle = on_startup_toggle
 
         self.root = tk.Tk()
+        if start_hidden:
+            self.root.withdraw()  # before any widgets — prevents the 1-frame flash
         self.root.title("VoiceFlow")
         self.root.geometry("420x300")
         self.root.resizable(False, False)
@@ -99,12 +101,10 @@ class UI:
         self._overlay_state: str = "idle"
         self._anim_running: bool = False
         self._latest_rms: float = 0.0
-        self._bar_heights: list[float] = [float(_BAR_MIN_H)] * _BAR_COUNT  # size = _BAR_COUNT
+        self._bar_heights: list[float] = [float(_BAR_MIN_H)] * _BAR_COUNT
 
         self._toast: tk.Toplevel | None = None
         self._build_main()
-        if start_hidden:
-            self.root.withdraw()  # tray-only on normal/boot launch
 
     # ── main window ───────────────────────────────────────────────────────────
 
