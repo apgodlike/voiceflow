@@ -1,5 +1,9 @@
 # VoiceFlow
 
+[![CI](https://github.com/apgodlike/voiceflow/actions/workflows/ci.yml/badge.svg)](https://github.com/apgodlike/voiceflow/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/apgodlike/voiceflow)](https://github.com/apgodlike/voiceflow/releases/latest)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
 **Free, open-source alternative to Wispr Flow for Windows.**
 
 Hold **Ctrl + Alt**, speak, release — cleaned text appears at your cursor instantly.
@@ -203,6 +207,10 @@ Fix: right-click the ZIP → **Extract All** → run `VoiceFlow.exe` from the ex
 **Transcription keeps failing** — check your API key in Settings. Failed jobs are retried automatically every 60 s and show as an orange tray icon.
 
 **SmartScreen warning on install** — app is unsigned. Click **More info → Run anyway**. Source is fully auditable above.
+
+## Privacy
+
+See [docs/privacy.md](docs/privacy.md) for the full policy. Short version: audio goes to OpenAI for transcription, everything else stays on your machine, nothing is sent to the VoiceFlow developers.
 
 ## Contributing
 

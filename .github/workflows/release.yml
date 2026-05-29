@@ -1,0 +1,122 @@
+name: Release
+
+# Triggers on version tags: v0.1.0, v1.2.3, etc.
+on:
+  push:
+    tags:
+      - "v[0-9]*.[0-9]*.[0-9]*"
+
+permissions:
+  contents: write  # required to create GitHub Releases
+
+env:
+  PYTHON_VERSION: "3.12"
+  SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
+  SIGNPATH_ORGANIZATION_ID: ${{ secrets.SIGNPATH_ORGANIZATION_ID }}
+
+jobs:
+  build-and-release:
+    name: Build, sign, and publish
+    runs-on: windows-latest
+
+    steps:
+      # ── 1. Checkout ──────────────────────────────────────────────────────────
+      - uses: actions/checkout@v4
+
+      # ── 2. Python ────────────────────────────────────────────────────────────
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install Python dependencies
+        run: pip install -r requirements-dev.txt
+
+      # ── 3. Tests must pass before we build anything ───────────────────────
+      - name: Run tests
+        run: pytest --tb=short -q
+
+      # ── 4. Extract version from tag (e.g. v0.2.0 → 0.2.0) ───────────────
+      - name: Set version
+        id: version
+        shell: pwsh
+        run: |
+          $ver = "${{ github.ref_name }}" -replace '^v', ''
+          echo "VERSION=$ver" >> $env:GITHUB_ENV
+          echo "version=$ver" >> $env:GITHUB_OUTPUT
+          Write-Host "Building version $ver"
+
+      # ── 5. Patch installer.iss with the tag version ───────────────────────
+      - name: Patch installer version
+        shell: pwsh
+        run: |
+          (Get-Content installer.iss) `
+            -replace '#define MyAppVersion ".*"', "#define MyAppVersion `"$env:VERSION`"" |
+            Set-Content installer.iss
+
+      # ── 6. PyInstaller ───────────────────────────────────────────────────
+      - name: Build app with PyInstaller
+        run: python -m PyInstaller VoiceFlow.spec --noconfirm
+
+      # ── 7. Inno Setup ────────────────────────────────────────────────────
+      - name: Install Inno Setup
+        run: choco install innosetup --yes --no-progress
+
+      - name: Build installer
+        shell: pwsh
+        run: iscc installer.iss
+
+      # ── 8. Upload unsigned installer as artifact (SignPath picks it up) ──
+      - name: Upload unsigned installer
+        id: upload-unsigned
+        uses: actions/upload-artifact@v4
+        with:
+          name: VoiceFlow-Setup-unsigned
+          path: dist/VoiceFlow-Setup.exe
+          retention-days: 3
+
+      # ── 9. Sign with SignPath (skipped until SIGNPATH_API_TOKEN is set) ──
+      #
+      # To activate: add SIGNPATH_API_TOKEN and SIGNPATH_ORGANIZATION_ID
+      # to GitHub repo Settings → Secrets → Actions after SignPath approves
+      # your application.  No code change needed — the step enables itself.
+      - name: Sign with SignPath
+        id: sign
+        if: env.SIGNPATH_API_TOKEN != ''
+        continue-on-error: true
+        uses: SignPath/github-action-submit-signing-request@v1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ secrets.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: voiceflow
+          signing-policy-slug: release-signing
+          github-artifact-id: ${{ steps.upload-unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: dist/
+
+      # ── 10. Extract release notes for this version from CHANGELOG.md ─────
+      - name: Extract release notes
+        id: notes
+        shell: pwsh
+        run: |
+          $content = Get-Content CHANGELOG.md -Raw
+          # Match the section for this version
+          $pattern = "(?s)## \[$env:VERSION\][^\n]*\n(.*?)(?=\n## \[|$)"
+          if ($content -match $pattern) {
+            $notes = $matches[1].Trim()
+          } else {
+            $notes = "See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details."
+          }
+          # Write to file (avoids shell escaping issues)
+          $notes | Out-File -FilePath release-notes.md -Encoding utf8
+          Write-Host "Release notes extracted."
+
+      # ── 11. Create GitHub Release ─────────────────────────────────────────
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: VoiceFlow ${{ steps.version.outputs.version }}
+          body_path: release-notes.md
+          files: dist/VoiceFlow-Setup.exe
+          fail_on_unmatched_files: true
