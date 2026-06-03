@@ -2,6 +2,7 @@
 import logging
 import logging.handlers
 import os
+import signal
 import threading
 from collections import deque
 from concurrent.futures import Future, ThreadPoolExecutor
@@ -405,6 +406,9 @@ class App:
 def main() -> None:
     load_dotenv()
     _setup_logging()
+    # Tkinter's mainloop runs in C and doesn't check Python signals; install a
+    # handler so Ctrl+C in the terminal kills the process immediately.
+    signal.signal(signal.SIGINT, lambda *_: os._exit(130))
     App().run()
     os._exit(0)  # tray/pool threads can linger; guarantee process death
 
