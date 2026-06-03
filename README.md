@@ -9,8 +9,7 @@
 Hold **Ctrl + Alt**, speak, release — cleaned text appears at your cursor instantly.
 No subscription. No account. Bring your own OpenAI key.
 
-<!-- DEMO GIF — record with ScreenToGif: hold Ctrl+Alt → speak → text appears -->
-<!-- ![VoiceFlow demo](docs/images/demo.gif) -->
+![VoiceFlow demo](VoiceFlow.gif)
 
 ## Install
 
