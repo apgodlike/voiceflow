@@ -6,6 +6,18 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-06-13
+
+### Added
+- Scoop install: `scoop bucket add voiceflow https://github.com/apgodlike/voiceflow`
+  then `scoop install voiceflow`. Scoop verifies the download by SHA-256, so the
+  Windows SmartScreen "Unknown publisher" prompt is skipped entirely — no
+  code-signing certificate required.
+- Portable zip release asset (`VoiceFlow-portable-*.zip`) plus a `.sha256`
+  sidecar: unzip and run `VoiceFlow.exe`, no installer. This is also the Scoop
+  install source (deterministic layout). The release workflow self-maintains the
+  Scoop manifest (version + url + hash) on each tag.
+
 ## [0.1.3] - 2026-05-29
 
 ### Fixed
