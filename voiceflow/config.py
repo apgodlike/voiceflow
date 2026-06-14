@@ -31,6 +31,10 @@ DEFAULTS: dict[str, Any] = {
     "input_device": None,       # sounddevice input device index; None = system default
     "backend": "openai",        # "openai" | "local" — transcription backend
     "local_model": "parakeet",  # local engine: "parakeet" (onnx) or a faster-whisper model
+    "ai_cleanup": False,        # opt-in: run transcript through an LLM to fix grammar/format
+    "ai_cleanup_provider": "ollama",  # "ollama" (local) | "openai" (cloud)
+    "ai_cleanup_model": "",     # provider model; blank = provider default
+    "ai_cleanup_prompt": "",    # custom prompt ({text} placeholder); blank = built-in
 }
 
 
@@ -120,6 +124,12 @@ def validate(cfg: dict[str, Any]) -> list[str]:
     if local_model not in _valid_models:
         warnings.append(
             f"'local_model' must be one of {'/'.join(_valid_models)}; got {local_model!r}."
+        )
+
+    provider = cfg.get("ai_cleanup_provider", "ollama")
+    if provider not in ("ollama", "openai"):
+        warnings.append(
+            f"'ai_cleanup_provider' must be \"ollama\" or \"openai\"; got {provider!r}."
         )
 
     return warnings
