@@ -22,7 +22,10 @@ logger = logging.getLogger("voiceflow.ui")
 _COLORS = {"recording": "#e03030", "transcribing": "#e0a000", "idle": "#808080"}
 _MODELS = ["gpt-4o-mini-transcribe", "gpt-4o-transcribe"]
 _SYSTEM_DEFAULT_DEV = "System default"
-_LOCAL_MODEL_SIZES = ["tiny", "base", "small", "medium", "large"]
+_LOCAL_MODEL_SIZES = [
+    "tiny", "tiny.en", "base", "base.en", "small", "small.en",
+    "medium", "medium.en", "large",
+]
 
 # ── animated overlay geometry ──────────────────────────────────────────────────
 _OV_TRANSPARENT = "#000001"   # Windows transparentcolor sentinel — these pixels vanish
@@ -312,7 +315,7 @@ class UI:
         backend_var = tk.StringVar(value=self._cfg.get("backend", "openai"))
         key_var = tk.StringVar(value=self._cfg.get("openai_api_key", ""))
         model_var = tk.StringVar(value=self._cfg.get("model", _MODELS[0]))
-        local_model_var = tk.StringVar(value=self._cfg.get("local_model", "base"))
+        local_model_var = tk.StringVar(value=self._cfg.get("local_model", "small.en"))
 
         ttk.Label(tab_api, text="Transcription backend").pack(anchor="w")
         _rb = ttk.Frame(tab_api)
@@ -656,7 +659,7 @@ class UI:
 
         _lm_pick_row = ttk.Frame(p_local)
         _lm_pick_row.pack(anchor="w", pady=(8, 4))
-        _local_model_var = tk.StringVar(value="base")
+        _local_model_var = tk.StringVar(value="small.en")
         _lm_cb = ttk.Combobox(_lm_pick_row, textvariable=_local_model_var,
                               values=_LOCAL_MODEL_SIZES, state="readonly", width=10)
         _lm_cb.pack(side="left")

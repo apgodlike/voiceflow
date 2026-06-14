@@ -4,28 +4,43 @@ from typing import Callable
 
 logger = logging.getLogger("voiceflow.model_manager")
 
+# ".en" variants are English-only: same size, faster and more accurate than the
+# multilingual model of the same size (no 99-language baggage). Multilingual
+# models (no suffix) handle any language. "large" is multilingual only.
 MODEL_REPOS: dict[str, str] = {
-    "tiny":   "Systran/faster-whisper-tiny",
-    "base":   "Systran/faster-whisper-base",
-    "small":  "Systran/faster-whisper-small",
-    "medium": "Systran/faster-whisper-medium",
-    "large":  "Systran/faster-whisper-large-v3",
+    "tiny":      "Systran/faster-whisper-tiny",
+    "tiny.en":   "Systran/faster-whisper-tiny.en",
+    "base":      "Systran/faster-whisper-base",
+    "base.en":   "Systran/faster-whisper-base.en",
+    "small":     "Systran/faster-whisper-small",
+    "small.en":  "Systran/faster-whisper-small.en",
+    "medium":    "Systran/faster-whisper-medium",
+    "medium.en": "Systran/faster-whisper-medium.en",
+    "large":     "Systran/faster-whisper-large-v3",
 }
 
 MODEL_SIZES: dict[str, str] = {
-    "tiny":   "75 MB",
-    "base":   "145 MB",
-    "small":  "485 MB",
-    "medium": "1.5 GB",
-    "large":  "3 GB",
+    "tiny":      "75 MB",
+    "tiny.en":   "75 MB",
+    "base":      "145 MB",
+    "base.en":   "145 MB",
+    "small":     "485 MB",
+    "small.en":  "485 MB",
+    "medium":    "1.5 GB",
+    "medium.en": "1.5 GB",
+    "large":     "3 GB",
 }
 
 MODEL_DESCS: dict[str, str] = {
-    "tiny":   "Fastest, lower accuracy",
-    "base":   "Good balance (recommended)",
-    "small":  "Better accuracy",
-    "medium": "High accuracy, needs 4 GB RAM",
-    "large":  "Best accuracy, needs 8 GB RAM",
+    "tiny":      "Fastest, lower accuracy (multilingual)",
+    "tiny.en":   "Fastest, English only",
+    "base":      "Fast, basic accuracy (multilingual)",
+    "base.en":   "Fast, English only",
+    "small":     "Good accuracy (multilingual)",
+    "small.en":  "Recommended — English, good accuracy",
+    "medium":    "High accuracy, needs 4 GB RAM, slow on CPU",
+    "medium.en": "High accuracy, English, slow on CPU",
+    "large":     "Best accuracy, needs 8 GB RAM (multilingual)",
 }
 
 

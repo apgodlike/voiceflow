@@ -110,7 +110,7 @@ class App:
         backend = self._cfg.get("backend", "openai")
         if backend == "local":
             from voiceflow import transcriber_local
-            model_name = self._cfg.get("local_model", "base")
+            model_name = self._cfg.get("local_model", "small.en")
             if not transcriber_local.is_loaded():
                 self._ui.toast(f"Loading local Whisper model '{model_name}'…")
             return transcriber_local.transcribe(audio_path, language=language,
@@ -129,7 +129,7 @@ class App:
 
     def _preload_local_model(self) -> None:
         """Load the configured local model into RAM in the background on startup."""
-        model_name = self._cfg.get("local_model", "base")
+        model_name = self._cfg.get("local_model", "small.en")
 
         def _load() -> None:
             try:
@@ -163,7 +163,7 @@ class App:
         self._apply_config_env()
         self._tray.set_backend(new_backend)
         if new_backend == "local":
-            model = self._cfg.get("local_model", "base")
+            model = self._cfg.get("local_model", "small.en")
             self._ui.toast(f"Backend → local ({model})")
         else:
             self._ui.toast("Backend → openai")

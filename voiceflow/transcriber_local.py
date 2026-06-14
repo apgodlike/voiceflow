@@ -14,10 +14,10 @@ _model_instance = None
 _model_name_loaded: str | None = None
 
 _MODEL_SIZES = {
-    "tiny": "75 MB",
-    "base": "145 MB",
-    "small": "485 MB",
-    "medium": "1.5 GB",
+    "tiny": "75 MB", "tiny.en": "75 MB",
+    "base": "145 MB", "base.en": "145 MB",
+    "small": "485 MB", "small.en": "485 MB",
+    "medium": "1.5 GB", "medium.en": "1.5 GB",
     "large": "3 GB",
 }
 
@@ -79,6 +79,10 @@ def transcribe(audio_path: Path, language: str | None = None, model_name: str = 
                 language=language or None,
                 beam_size=1,
                 vad_filter=True,
+                # Each dictation segment is independent; not feeding prior text
+                # avoids a slow per-window dependency and stops the model from
+                # looping/hallucinating on silence. Faster + safer on CPU.
+                condition_on_previous_text=False,
             )
             text = " ".join(seg.text for seg in segments).strip()
         elapsed = time.monotonic() - t0

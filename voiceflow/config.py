@@ -30,7 +30,7 @@ DEFAULTS: dict[str, Any] = {
     "paste_mode": "clipboard",  # "clipboard" (Ctrl+V) or "type" (character-by-character)
     "input_device": None,       # sounddevice input device index; None = system default
     "backend": "openai",        # "openai" | "local" — transcription backend
-    "local_model": "base",      # faster-whisper model: tiny, base, small, medium, large
+    "local_model": "small.en",  # faster-whisper model; ".en" = English-only (faster + more accurate)
 }
 
 
@@ -110,10 +110,14 @@ def validate(cfg: dict[str, Any]) -> list[str]:
             f"'backend' must be \"openai\" or \"local\"; got {backend!r}. Falling back to openai."
         )
 
-    local_model = cfg.get("local_model", "base")
-    if local_model not in ("tiny", "base", "small", "medium", "large"):
+    local_model = cfg.get("local_model", "small.en")
+    _valid_models = (
+        "tiny", "tiny.en", "base", "base.en", "small", "small.en",
+        "medium", "medium.en", "large",
+    )
+    if local_model not in _valid_models:
         warnings.append(
-            f"'local_model' must be one of tiny/base/small/medium/large; got {local_model!r}."
+            f"'local_model' must be one of {'/'.join(_valid_models)}; got {local_model!r}."
         )
 
     return warnings
