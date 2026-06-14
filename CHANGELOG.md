@@ -17,6 +17,17 @@ All notable changes to this project are documented here. The format is based on
   maintainer's real accented recordings it beat `distil-medium.en` on both words
   and punctuation. English-only; Whisper `small`/`medium` remain for other
   languages. Downloads the ~660 MB int8 model on first use; ~760 MB RAM.
+- **Cross-platform install via pipx** — `pipx install "voiceflow-dictation[local]"`
+  runs on Windows, macOS, and Linux from source (no signing, no SmartScreen).
+  Additive: the Windows `.exe`/Scoop build is unchanged. Includes macOS/Linux
+  support in the data-dir and start-on-login logic.
+- **Optional AI text cleanup** — opt-in LLM pass (local Ollama by default, or
+  OpenAI) that polishes grammar/format after the rule-based cleaner. Off by
+  default and fails open (never loses a dictation).
+- **Red REC indicator** on the recording overlay so the state is unmistakable
+  (silent — no sound notifications).
+- Latency benchmark (`tools/latency_bench.py`) + `docs/benchmarks.md`: ~1 s to
+  text on the default engine, flat regardless of recording length.
 
 ### Changed
 - Default local model is now `parakeet`; the local model dropdown lists it first,

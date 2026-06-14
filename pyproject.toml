@@ -1,0 +1,61 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+# Additive cross-platform install path: `pipx install voiceflow-dictation` works on
+# Windows, macOS, and Linux and runs from source — no code signing, no SmartScreen.
+# This does NOT replace the Windows .exe/Scoop build (VoiceFlow.spec / installer.iss);
+# those are unchanged and remain the primary Windows download.
+[project]
+name = "voiceflow-dictation"
+dynamic = ["version"]
+description = "Free, private, offline voice typing for Windows/macOS/Linux — local Whisper or Parakeet, no API key."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Praveen" }]
+keywords = ["dictation", "speech-to-text", "whisper", "parakeet", "voice-typing", "transcription"]
+classifiers = [
+    "Environment :: X11 Applications",
+    "Environment :: Win32 (MS Windows)",
+    "Environment :: MacOS X",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Topic :: Multimedia :: Sound/Audio :: Speech",
+]
+dependencies = [
+    "sounddevice>=0.5",
+    "soundfile>=0.13",
+    "numpy>=2",
+    "openai>=2",
+    "pynput>=1.8",
+    "pyperclip>=1.11",
+    "PyAutoGUI>=0.9",
+    "pystray>=0.19",
+    "Pillow>=11",
+    "python-dotenv>=1",
+    "requests>=2.32",
+]
+
+[project.optional-dependencies]
+# Local engines are optional extras so a base install stays lean; users add what
+# they want. The .exe bundles both already.
+whisper = ["faster-whisper>=1.1", "huggingface_hub>=0.30"]
+parakeet = ["onnx-asr>=0.11", "onnxruntime>=1.20"]
+local = ["faster-whisper>=1.1", "huggingface_hub>=0.30", "onnx-asr>=0.11", "onnxruntime>=1.20"]
+
+[project.urls]
+Homepage = "https://github.com/apgodlike/voiceflow"
+Issues = "https://github.com/apgodlike/voiceflow/issues"
+
+[project.scripts]
+voiceflow = "voiceflow.main:main"
+
+[tool.setuptools]
+packages = ["voiceflow"]
+
+[tool.setuptools.dynamic]
+version = { attr = "voiceflow.__version__" }

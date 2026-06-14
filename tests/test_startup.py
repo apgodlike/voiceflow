@@ -11,15 +11,15 @@ from voiceflow import startup
 
 def test_command_dev_mode():
     with patch.object(sys, "frozen", False, create=True):
-        cmd = startup._command()
-    assert "-m voiceflow.main" in cmd
+        cmd = startup._win_command()
+    assert "voiceflow.main" in cmd
     assert sys.executable in cmd
 
 
 def test_command_frozen_mode():
     with patch.object(sys, "frozen", True, create=True):
-        cmd = startup._command()
-    assert "-m voiceflow.main" not in cmd
+        cmd = startup._win_command()
+    assert "voiceflow.main" not in cmd
     assert sys.executable in cmd
 
 
