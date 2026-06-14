@@ -44,11 +44,14 @@ _BAR_W = 3
 _BAR_GAP = 4
 _BARS_W = _BAR_COUNT * _BAR_W + (_BAR_COUNT - 1) * _BAR_GAP  # 27+32 = 59 px
 _OVERLAY_H = 44
-_OVERLAY_W = 110              # wide enough for pill proportions
-_PAD_X = (_OVERLAY_W - _BARS_W) // 2                          # center bars in pill
-_BAR_MAX_H = 28               # center bar max height
+_DOT_ZONE = 26               # left zone reserved for the red REC dot
+_OVERLAY_W = 132             # pill width (dot zone + centered bars)
+_PAD_X = _DOT_ZONE + (_OVERLAY_W - _DOT_ZONE - _BARS_W) // 2  # center bars right of the dot
+_DOT_CX = 16                 # REC dot center x
+_DOT_R = 5                   # REC dot base radius
+_BAR_MAX_H = 28              # center bar max height
 _BAR_MIN_H = 3
-_ANIM_MS = 40                 # 25 fps
+_ANIM_MS = 40                # 25 fps
 
 
 
@@ -238,6 +241,15 @@ class UI:
                 fill="#FFFFFF", outline="", tags="anim",
             )
 
+        # Pulsing red REC dot — the universal "recording" signal, so the state is
+        # unmistakable at a glance (left of the waveform).
+        pulse = 0.5 + 0.5 * math.sin(t * 4.0)
+        r = _DOT_R - 1 + pulse * 2  # gently breathe between 4 and 6 px
+        canvas.create_oval(
+            _DOT_CX - r, cy - r, _DOT_CX + r, cy + r,
+            fill="#ff453a", outline="", tags="anim",
+        )
+
     def _draw_transcribing_frame(self) -> None:
         """Slow traveling sine wave — calm 'thinking' state.
 
@@ -271,6 +283,14 @@ class UI:
                 x0, int(cy - h / 2), x0 + _BAR_W, int(cy + h / 2),
                 fill=color, outline="", tags="anim",
             )
+
+        # Dim amber dot in the REC-dot slot — reads as "processing" and keeps the
+        # pill layout consistent with the recording state.
+        r = _DOT_R - 1
+        canvas.create_oval(
+            _DOT_CX - r, cy - r, _DOT_CX + r, cy + r,
+            fill="#a06a00", outline="", tags="anim",
+        )
 
     # ── silent toast ──────────────────────────────────────────────────────────
 
