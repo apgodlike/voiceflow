@@ -1,0 +1,34 @@
+{
+  "version": "0.1.4",
+  "description": "Free, open-source voice-to-text for Windows. Hold Ctrl+Alt, speak, release — cleaned text pastes at the cursor.",
+  "homepage": "https://github.com/apgodlike/voiceflow",
+  "license": "MIT",
+  "notes": [
+    "VoiceFlow uses your own OpenAI API key. On first launch the Settings window opens — paste your key there.",
+    "Usage: hold Ctrl+Alt and talk. Docs: https://github.com/apgodlike/voiceflow"
+  ],
+  "architecture": {
+    "64bit": {
+      "url": "https://github.com/apgodlike/voiceflow/releases/download/v0.1.4/VoiceFlow-portable-0.1.4.zip",
+      "hash": "58fbc1623d832f58f215fa8f56479bfd798936fc826c72e7f9a39395a49063ca"
+    }
+  },
+  "bin": "VoiceFlow.exe",
+  "shortcuts": [
+    [
+      "VoiceFlow.exe",
+      "VoiceFlow"
+    ]
+  ],
+  "checkver": "github",
+  "autoupdate": {
+    "architecture": {
+      "64bit": {
+        "url": "https://github.com/apgodlike/voiceflow/releases/download/v$version/VoiceFlow-portable-$version.zip"
+      }
+    },
+    "hash": {
+      "url": "$url.sha256"
+    }
+  }
+}

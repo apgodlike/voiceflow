@@ -66,6 +66,21 @@ jobs:
         shell: pwsh
         run: iscc installer.iss
 
+      # ── 7b. Portable zip (no installer, lowest SmartScreen friction) ─────
+      # Zips the PyInstaller onedir output so the zip root holds VoiceFlow.exe
+      # directly — this is the Scoop install source (deterministic layout, no
+      # innoextract path guessing). Also writes a .sha256 sidecar the Scoop
+      # manifest reads via autoupdate "hash": { "url": "$url.sha256" }.
+      - name: Build portable zip
+        shell: pwsh
+        run: |
+          $zip = "dist/VoiceFlow-portable-$env:VERSION.zip"
+          Compress-Archive -Path dist/VoiceFlow/* -DestinationPath $zip -Force
+          $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
+          $hash | Out-File "$zip.sha256" -Encoding ascii -NoNewline
+          echo "ZIP_HASH=$hash" >> $env:GITHUB_ENV
+          Write-Host "Portable zip SHA256: $hash"
+
       # ── 8. Upload unsigned installer as artifact (SignPath picks it up) ──
       - name: Upload unsigned installer
         id: upload-unsigned
@@ -118,5 +133,29 @@ jobs:
           tag_name: ${{ github.ref_name }}
           name: VoiceFlow ${{ steps.version.outputs.version }}
           body_path: release-notes.md
-          files: dist/VoiceFlow-Setup.exe
+          files: |
+            dist/VoiceFlow-Setup.exe
+            dist/VoiceFlow-portable-${{ env.VERSION }}.zip
+            dist/VoiceFlow-portable-${{ env.VERSION }}.zip.sha256
           fail_on_unmatched_files: true
+
+      # ── 12. Bump the Scoop manifest to this release and commit it back ────
+      # Self-maintaining bucket: fills version + url + the just-computed zip
+      # hash, then pushes to main. Best-effort — a push race must not fail the
+      # release (the manifest can also be refreshed later with `scoop update`).
+      - name: Update Scoop manifest
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $path = "bucket/voiceflow.json"
+          $m = Get-Content $path -Raw | ConvertFrom-Json
+          $url = "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/VoiceFlow-portable-$env:VERSION.zip"
+          $m.version = $env:VERSION
+          $m.architecture.'64bit'.url = $url
+          $m.architecture.'64bit'.hash = $env:ZIP_HASH
+          $m | ConvertTo-Json -Depth 10 | Set-Content $path -Encoding utf8
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add $path
+          git commit -m "chore: bump Scoop manifest to $env:VERSION [skip ci]"
+          git push origin HEAD:main

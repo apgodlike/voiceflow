@@ -9,8 +9,7 @@
 Hold **Ctrl + Alt**, speak, release — cleaned text appears at your cursor instantly.
 No subscription. No account. Bring your own OpenAI key.
 
-<!-- DEMO GIF — record with ScreenToGif: hold Ctrl+Alt → speak → text appears -->
-<!-- ![VoiceFlow demo](docs/images/demo.gif) -->
+![VoiceFlow demo](VoiceFlow.gif)
 
 ## Install
 
@@ -22,14 +21,26 @@ irm https://raw.githubusercontent.com/apgodlike/voiceflow/main/install.ps1 | iex
 
 Downloads the latest release and launches the installer automatically.
 
-**Option B — Manual download:**
+**Option B — Scoop** (no SmartScreen prompt):
 
-1. Grab **`VoiceFlow-Setup.exe`** from the [Releases page](https://github.com/apgodlike/voiceflow/releases).
+```powershell
+scoop bucket add voiceflow https://github.com/apgodlike/voiceflow
+scoop install voiceflow
+```
+
+Scoop downloads and verifies the release by SHA-256, so there is no "Unknown publisher" warning. Don't have Scoop? Install it once with `irm get.scoop.sh | iex`. Update later with `scoop update voiceflow`.
+
+**Option C — Manual download:**
+
+1. Grab **`VoiceFlow-Setup.exe`** (installer) or **`VoiceFlow-portable-*.zip`** (no install — unzip and run `VoiceFlow.exe`) from the [Releases page](https://github.com/apgodlike/voiceflow/releases).
 2. Run it.
 
-> **Windows SmartScreen warning** — the app is currently unsigned. Click **More info → Run anyway**. Code signing is in progress; this prompt will disappear in a future release. Source is fully auditable above.
+> **Windows SmartScreen warning** — the installer and exe are currently unsigned, so a "Windows protected your PC" prompt appears. Click **More info → Run anyway**. (Scoop in Option B avoids this entirely.) Code signing is in progress; this prompt will disappear in a future release. Source is fully auditable above.
 
-On first launch the Settings window opens — paste your OpenAI API key. Need one? See [Getting an OpenAI API key](docs/getting-an-openai-api-key.md).
+On first launch a short setup wizard opens. Pick one:
+
+- **Cloud — OpenAI** — paste your API key. Need one? See [Getting an OpenAI API key](docs/getting-an-openai-api-key.md).
+- **Local — Whisper** — no key, no cost, fully offline. Runs on your PC via [faster-whisper](https://github.com/SYSTRAN/faster-whisper); a one-time model download (75 MB–3 GB, your choice) happens in the wizard. Switch backends anytime from the tray menu.
 
 Hold **Ctrl + Alt** and talk. That's it.
 
@@ -40,8 +51,8 @@ Hold **Ctrl + Alt** and talk. That's it.
 | Price | **Free** | $14/month |
 | Source | **Open source (MIT)** | Closed |
 | Platform | Windows | Mac + Windows |
-| Transcription | OpenAI API (your key) | Proprietary |
-| Offline mode | Planned | Paid tier |
+| Transcription | OpenAI API (your key) **or local Whisper** | Proprietary |
+| Offline mode | **Yes — local Whisper, no key** | Paid tier |
 
 **What it does:**
 - **Instant transcription** — silence-aware segmentation transcribes audio *during* recording so results appear the moment you stop talking
