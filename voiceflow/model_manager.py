@@ -1,8 +1,22 @@
 """Model download and cache-check for the local Whisper backend."""
 import logging
+import os
 from typing import Callable
 
 logger = logging.getLogger("voiceflow.model_manager")
+
+
+def recommended_model() -> str:
+    """Pick a sensible default local model from CPU core count.
+
+    ``medium`` needs ~4 GB RAM and is only real-time on a capable multi-core
+    machine; on a weak CPU it backlogs behind speech and pastes late. ``small.en``
+    is fast everywhere. We key off the logical core count: 8+ -> medium.en,
+    otherwise small.en. English-only (.en) covers the common case; users pick a
+    multilingual model in the wizard if they need other languages.
+    """
+    cores = os.cpu_count() or 2
+    return "medium.en" if cores >= 8 else "small.en"
 
 # ".en" variants are English-only: same size, faster and more accurate than the
 # multilingual model of the same size (no 99-language baggage). Multilingual

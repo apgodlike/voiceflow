@@ -10,6 +10,7 @@ No method here makes a sound — toasts are silent by design.
 import json
 import logging
 import math
+import os
 import time as _time
 import tkinter as tk
 from tkinter import messagebox, ttk
@@ -657,14 +658,23 @@ class UI:
         ttk.Label(p_local, text="Choose Whisper model",
                   font=("Segoe UI", 12, "bold")).pack(anchor="w")
 
+        from voiceflow import model_manager as _mm
+        _recommended = _mm.recommended_model()
+
         _lm_pick_row = ttk.Frame(p_local)
         _lm_pick_row.pack(anchor="w", pady=(8, 4))
-        _local_model_var = tk.StringVar(value="small.en")
+        _local_model_var = tk.StringVar(value=_recommended)
         _lm_cb = ttk.Combobox(_lm_pick_row, textvariable=_local_model_var,
                               values=_LOCAL_MODEL_SIZES, state="readonly", width=10)
         _lm_cb.pack(side="left")
         _lm_desc = ttk.Label(_lm_pick_row, foreground="#666")
         _lm_desc.pack(side="left", padx=8)
+
+        ttk.Label(
+            p_local,
+            text=f"✓ Recommended for your PC ({os.cpu_count() or '?'} CPU cores): {_recommended}",
+            foreground="#2a8a2a",
+        ).pack(anchor="w", pady=(0, 2))
 
         _lm_stat = ttk.Label(p_local)
         _lm_stat.pack(anchor="w", pady=(0, 6))
