@@ -323,19 +323,32 @@ class App:
         self._ui.toast(f"Recording stopped — {secs // 60} min limit. Start again to continue.")
         self._on_stop()
 
-    # Local Whisper pays a fixed ~30 s-window encoder cost per call, so it needs
-    # chunks big enough to amortize it (each ~12-15 s chunk transcribes in ~4 s,
-    # keeping up with speech 4-5x over). The OpenAI backend is network-bound and
-    # parallelizes, so smaller chunks cut latency there.
-    _LOCAL_SEGMENT_MIN_MS = 12000
-    _LOCAL_SEGMENT_MAX_MS = 15000
+    @staticmethod
+    def _local_segment_ms(model_name: str) -> tuple[int, int]:
+        """(min, max) chunk length for the local backend, sized to the model's
+        fixed per-call encoder cost so transcription keeps pace with speech and
+        the post-release tail = one final chunk.
+
+        Whisper pads every call to a 30 s window, so each transcription pays the
+        full encoder cost regardless of audio length. The bigger the encoder, the
+        bigger the chunk must be to amortize it and keep the real-time margin:
+          * large-v3 encoder ~12.5 s/call on CPU -> ~24-28 s chunks
+          * medium ~3.8 s/call                  -> ~12-15 s chunks
+          * small/base/tiny ~0.5-1.4 s/call     -> ~12-15 s is plenty
+        Note: a large model's tail can't beat its ~12.5 s encoder floor on CPU —
+        chunking only keeps that flat across recording length, it can't shrink it.
+        """
+        if "large" in model_name:
+            return 24000, 28000
+        return 12000, 15000
 
     def _on_start(self) -> None:
         with self._seg_lock:
             self._seg_futures = {}
             self._seg_paths = {}
         if self._cfg.get("backend") == "local":
-            seg_min, seg_max = self._LOCAL_SEGMENT_MIN_MS, self._LOCAL_SEGMENT_MAX_MS
+            seg_min, seg_max = self._local_segment_ms(
+                self._cfg.get("local_model", "distil-small.en"))
         else:
             seg_min, seg_max = recorder.SEGMENT_MIN_MS, recorder.SEGMENT_MAX_MS
         self._current_rid = recorder.start_recording(

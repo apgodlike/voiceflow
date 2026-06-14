@@ -6,6 +6,18 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.2.6] - 2026-06-14
+
+### Changed
+- Local chunk size now scales with the chosen model so the during-recording
+  pipeline keeps pace with speech. Large models pay a large fixed per-call
+  encoder cost (large-v3 ~12.5 s on a 6-core CPU, *regardless of clip length* —
+  it can't be reduced by quantization, VAD, or chunk size), so they use ~24-28 s
+  chunks to amortize it; medium/small keep ~12-15 s. This keeps a large model's
+  latency flat (~13 s) across recording length instead of growing linearly, but
+  note a large model cannot beat its ~12.5 s encoder floor on CPU — for snappy
+  (~3-4 s) dictation use a medium or smaller model.
+
 ## [0.2.5] - 2026-06-14
 
 ### Changed

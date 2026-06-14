@@ -51,24 +51,30 @@ def test_tiny_segment_is_dropped(app, tmp_path):
     assert not p.exists()
 
 
-@pytest.mark.parametrize("backend,expect_local_chunks", [("local", True), ("openai", False)])
-def test_on_start_chunk_size_by_backend(app, backend, expect_local_chunks):
-    app._cfg["backend"] = backend
+def test_on_start_openai_uses_recorder_defaults(app):
+    app._cfg["backend"] = "openai"
     captured = {}
-
-    def fake_start(**kw):
-        captured.update(kw)
-        return "rid123"
-
-    with patch.object(main.recorder, "start_recording", side_effect=fake_start):
+    with patch.object(main.recorder, "start_recording",
+                      side_effect=lambda **kw: captured.update(kw) or "rid"):
         app._on_start()
+    assert captured["segment_min_ms"] == main.recorder.SEGMENT_MIN_MS
+    assert captured["segment_max_ms"] == main.recorder.SEGMENT_MAX_MS
 
-    if expect_local_chunks:
-        assert captured["segment_min_ms"] == main.App._LOCAL_SEGMENT_MIN_MS
-        assert captured["segment_max_ms"] == main.App._LOCAL_SEGMENT_MAX_MS
-    else:
-        assert captured["segment_min_ms"] == main.recorder.SEGMENT_MIN_MS
-        assert captured["segment_max_ms"] == main.recorder.SEGMENT_MAX_MS
+
+@pytest.mark.parametrize("model,expected", [
+    ("distil-small.en", (12000, 15000)),
+    ("medium.en", (12000, 15000)),
+    ("distil-large-v3", (24000, 28000)),
+    ("large", (24000, 28000)),
+])
+def test_on_start_local_chunk_size_scales_with_model(app, model, expected):
+    app._cfg["backend"] = "local"
+    app._cfg["local_model"] = model
+    captured = {}
+    with patch.object(main.recorder, "start_recording",
+                      side_effect=lambda **kw: captured.update(kw) or "rid"):
+        app._on_start()
+    assert (captured["segment_min_ms"], captured["segment_max_ms"]) == expected
 
 
 def test_on_stop_empty_futures_falls_back_to_full_file(app, tmp_path):
