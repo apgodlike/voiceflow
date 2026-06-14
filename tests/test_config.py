@@ -40,8 +40,8 @@ def test_resolved_model_falls_back_to_default():
         assert config.resolved_model({"model": "gpt-4o-transcribe"}) == "gpt-4o-transcribe"
 
 
-def test_max_recording_cap_default_is_ten_minutes():
-    assert config.DEFAULTS["max_recording_sec"] == 600
+def test_max_recording_cap_default_is_thirty_minutes():
+    assert config.DEFAULTS["max_recording_sec"] == 1800
 
 
 # ── validate ──────────────────────────────────────────────────────────────────

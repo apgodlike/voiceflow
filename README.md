@@ -85,7 +85,7 @@ Choose in the first-run wizard or Settings. English-only models are faster *and*
 
 | Model | Best for | Speed* | Download |
 |-------|----------|--------|----------|
-| **Parakeet** | **Recommended** — English. Fastest + most accurate, no GPU needed | ~2 s (30 s clip) | 660 MB |
+| **Parakeet** | **Recommended** — English. Fastest + most accurate, no GPU needed | ~1 s | 660 MB |
 | distil-medium.en | English (Whisper), fast + accurate | ~3–4 s | 790 MB |
 | distil-small.en | Older / low-core PCs (Whisper) | ~2 s | 330 MB |
 | distil-large-v3 | Whisper max accuracy (slow on CPU) | ~15–20 s | 1.5 GB |
@@ -105,15 +105,15 @@ Choose in the first-run wizard or Settings. English-only models are faster *and*
 | Source | **Open source (MIT)** | Closed |
 | Works offline | **Yes — fully local, no account** | Paid tier |
 | Privacy | **Audio never leaves your PC** (local mode) | Cloud |
-| Platform | Windows | Mac + Windows |
-| Transcription | Local Whisper **or** OpenAI API | Proprietary cloud |
+| Platform | Windows (+ macOS/Linux via pipx) | Mac + Windows |
+| Transcription | Local **Parakeet / Whisper** or OpenAI API | Proprietary cloud |
 
 ## Features
 
 - **Works in any app** — pastes at your cursor, no integration needed
-- **Local or cloud** — offline Whisper (no key) or OpenAI API, toggle live from the tray
-- **Flat latency** — transcribes during recording; result lands seconds after you release, any length
-- **Smart cleaning** — strips fillers, auto-capitalizes sentences, optional spoken punctuation
+- **Local or cloud** — offline **Parakeet** (default) or Whisper, no key — or an OpenAI key for the cloud; toggle live from the tray
+- **Flat latency** — transcribes during recording; result lands ~1s after you release, any length
+- **Smart cleaning** — strips fillers, auto-capitalizes sentences, optional spoken punctuation, optional AI (LLM) polish
 - **Custom dictionary** — fix recurring mistranscriptions (names, jargon) deterministically
 - **Animated overlay** — audio-reactive waveform while recording
 - **Paste or type** — Ctrl+V (default) or character-by-character for apps that block paste
@@ -129,7 +129,7 @@ Both modes use **Left Ctrl + Left Alt**:
 | **Hold** | Press and hold | Recording starts after 200 ms; release → stops |
 | **Toggle** | Double-tap (two down+up cycles within 400 ms) | Recording stays on; next tap stops |
 
-Recording auto-stops at 10 minutes (configurable). A toast notifies you to start again.
+Recording auto-stops at 30 minutes — a safety net against a forgotten toggle / stuck key (configurable; `0` = no cap). A toast notifies you to start again.
 
 ## Settings
 
@@ -195,7 +195,7 @@ The first-run wizard sets up local or cloud mode. (For cloud, you can also add `
 | Key | Default | Description |
 |-----|---------|-------------|
 | `backend` | wizard-set (**Local** recommended) | `"local"` (offline Whisper) or `"openai"` (cloud). The first-run wizard sets this; `"openai"` is only the bare fallback when no wizard has run and the key is unset. |
-| `local_model` | `"distil-medium.en"` | Local Whisper model (see table above) |
+| `local_model` | `"parakeet"` | Local engine: `"parakeet"` (default) or a Whisper model (see table above) |
 | `openai_api_key` | `""` | API key for cloud mode (fallback: `OPENAI_API_KEY` env var) |
 | `model` | `gpt-4o-mini-transcribe` | Cloud transcription model |
 | `language` | `""` | ISO-639-1 hint, e.g. `"en"`, `"hi"` — blank = auto |
@@ -204,7 +204,7 @@ The first-run wizard sets up local or cloud mode. (For cloud, you can also add `
 | `ai_cleanup` | `false` | Opt-in: polish the transcript with an LLM (grammar/format) |
 | `ai_cleanup_provider` | `"ollama"` | `"ollama"` (local, private) or `"openai"` (cloud) |
 | `ai_cleanup_model` | `""` | LLM model; blank = provider default (`llama3.2` / `gpt-4o-mini`) |
-| `max_recording_sec` | `600` | Auto-stop cap in seconds; `0` = no cap |
+| `max_recording_sec` | `1800` | Auto-stop cap in seconds (30 min safety net); `0` = no cap |
 | `voice_commands` | `false` | Spoken punctuation commands |
 | `code_mode` | `false` | No auto-cap / no trailing period |
 | `raw_mode` | `false` | Verbatim transcript |
@@ -235,7 +235,7 @@ ISCC installer.iss                       # → dist\VoiceFlow-Setup.exe  (needs 
 hotkey.py ──── on_start / on_stop
                     │
                     ▼
-             recorder.py ─── chunks (cut on silence) ──► transcriber (local Whisper or OpenAI)
+             recorder.py ─── chunks (cut on silence) ──► transcriber (Parakeet / Whisper / OpenAI)
                     │                                          │ stitch on stop
                     │ full OGG (durable)                       ▼
                     ▼                                    cleaner.py
