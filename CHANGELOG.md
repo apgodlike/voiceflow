@@ -6,6 +6,31 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-06-14
+
+### Added
+- **Local transcription backend** — run Whisper on your own PC via
+  `faster-whisper`, no OpenAI API key, no cloud, no cost. A first-run setup
+  wizard lets you choose Cloud (OpenAI) or Local, downloads the model with a
+  progress bar, and the tray menu toggles backends live.
+- English-only (`.en`) model variants (`tiny.en`/`base.en`/`small.en`/`medium.en`):
+  same download size, faster and more accurate for English than the multilingual
+  model of the same size. Multilingual models remain for other languages.
+- Hardware-aware model recommendation in the wizard — pre-selects `medium.en` on
+  capable multi-core machines, `small.en` otherwise, based on CPU core count.
+
+### Changed
+- Default local model is `small.en` (safe on any hardware); the wizard upgrades
+  the recommendation to `medium.en` on capable CPUs.
+- Local inference uses `condition_on_previous_text=False` — faster per segment
+  and avoids silence-driven hallucination loops.
+
+### Fixed
+- Windowed (no-console) build crashed local model downloads with
+  `'NoneType' object has no attribute 'write'`: `sys.stdout`/`sys.stderr` are
+  `None` when frozen, and huggingface_hub's tqdm progress bar wrote to them.
+  `run.py` now redirects the missing streams to the null device at startup.
+
 ## [0.1.4] - 2026-06-13
 
 ### Added
