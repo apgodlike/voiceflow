@@ -1,5 +1,9 @@
 # VoiceFlow — Build Progress
 
+> **Historical build log** of the original v0.1 MVP (dated 2026-05-14). The project
+> has evolved well past this — see [CHANGELOG.md](CHANGELOG.md) for what's shipped.
+> Kept for provenance.
+
 Last completed step: 8
 
 ## Steps

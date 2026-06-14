@@ -1,5 +1,11 @@
 # VoiceFlow MVP — Implementation Plan
 
+> **Historical artifact.** This is the original v0.1 MVP build plan (OpenAI-Whisper-
+> only, WAV, sqlite history). The app has since evolved — default local **Parakeet**
+> engine + Whisper, OGG audio, chunked streaming, no sqlite. For the **current**
+> architecture see [CLAUDE.md](CLAUDE.md), [docs/ROADMAP.md](docs/ROADMAP.md), and
+> [CHANGELOG.md](CHANGELOG.md). Kept for provenance.
+
 ## Context
 
 Build **VoiceFlow**: a Windows desktop voice-to-text app. Hold-or-toggle hotkey → mic captures audio → audio written to disk continuously → OpenAI Whisper transcribes → regex filler-cleaner strips um/uh/etc. → cleaned text auto-pasted at cursor via clipboard + `Ctrl+V`.

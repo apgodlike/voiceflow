@@ -41,4 +41,4 @@ if ($proc.ExitCode -ne 0 -and $proc.ExitCode -ne $null) {
 Write-Host ""
 Write-Host "VoiceFlow $version installed."
 Write-Host "Launch it from the Start Menu or find VoiceFlow in your taskbar tray."
-Write-Host "On first launch, enter your OpenAI API key in the Settings window."
+Write-Host "On first launch, a wizard sets up Local mode (no API key, runs Parakeet/Whisper on your PC) or Cloud (OpenAI)."

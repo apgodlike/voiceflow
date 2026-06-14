@@ -1,7 +1,7 @@
 # Contributing to VoiceFlow
 
-Thanks for your interest! VoiceFlow is a Windows voice-to-text app. Contributions
-of all sizes are welcome.
+Thanks for your interest! VoiceFlow is a private, offline voice-to-text app —
+Windows-first, with macOS/Linux via pipx. Contributions of all sizes are welcome.
 
 ## Dev setup
 
@@ -13,8 +13,9 @@ venv\Scripts\activate
 pip install -r requirements-dev.txt
 ```
 
-Set your OpenAI key either in the in-app Settings dialog or a `.env` file
-(`OPENAI_API_KEY=sk-...`).
+No setup is needed for local mode (Parakeet/Whisper, the default — the first-run
+wizard downloads a model). Only if you want **cloud** mode, set an OpenAI key in the
+in-app Settings dialog or a `.env` file (`OPENAI_API_KEY=sk-...`).
 
 ## Run the app
 
@@ -42,7 +43,7 @@ python -m voiceflow.queue --list
 
 ## Building the installer
 
-See the "Building the Windows installer" section in [README.md](README.md).
+See the "Building from source" section in [README.md](README.md).
 Always test the built `dist\VoiceFlow\VoiceFlow.exe` on a machine without Python.
 
 ## Conventions

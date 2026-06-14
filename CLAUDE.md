@@ -33,8 +33,12 @@ python -m voiceflow.paster "hello world"       # sleeps 3 s then pastes
 python -m voiceflow.queue --list
 python -m voiceflow.hotkey --test              # interactive, Ctrl+C to exit
 python -m voiceflow.tray --test               # cycles icon states
-python -m voiceflow.transcriber path/to/file.ogg  # needs OPENAI_API_KEY
+python -m voiceflow.transcriber path/to/file.ogg                 # cloud — needs OPENAI_API_KEY
+python -m voiceflow.transcriber_local path/to/file.ogg --model distil-small.en  # local Whisper
+python -m voiceflow.transcriber_parakeet path/to/file.ogg        # local Parakeet (default engine)
 ```
+
+The local engines download their model on first use; no API key needed.
 
 ## Architecture
 
@@ -80,7 +84,7 @@ States: `IDLE → RECORDING_HOLD → IDLE` (hold path) or `IDLE → RECORDING_TO
 
 `like` is only stripped when preceded by a "to be" verb (`was/am/were/is/are/been/being/be`). The regex captures the verb in group 1 and substitutes back `\1` to preserve the verb.
 
-`clean()` takes optional config-driven kwargs (defaults reproduce the original zero-config behavior, so `clean(text)` is unchanged): `dictionary` (phrase→replacement map, applied first, longest-key-first, case-insensitive, target inserted verbatim via a lambda so `\1` in the value stays literal), `extra_fillers` (merged into the built-in filler regex), `voice_commands` (opt-in, default off — spoken "comma"/"period"/"new line"/"new paragraph"/… become literal symbols; newlines round-trip through `\x00…\x00` sentinels that survive whitespace collapse and are restored last), `code_mode` (skip auto-capitalize + auto-period for dictating code), and `raw_mode` (return the verbatim transcript, bypassing every pass). Capitalization is sentence-aware: `_capitalize_sentences` uppercases the first letter and the start of each sentence (after `.`/`!`/`?` + space, or after a newline). `main.App._clean` passes the user's `config.json` values in; there is no Settings-GUI editor for these yet (users edit `config.json` directly).
+`clean()` takes optional config-driven kwargs (defaults reproduce the original zero-config behavior, so `clean(text)` is unchanged): `dictionary` (phrase→replacement map, applied first, longest-key-first, case-insensitive, target inserted verbatim via a lambda so `\1` in the value stays literal), `extra_fillers` (merged into the built-in filler regex), `voice_commands` (opt-in, default off — spoken "comma"/"period"/"new line"/"new paragraph"/… become literal symbols; newlines round-trip through `\x00…\x00` sentinels that survive whitespace collapse and are restored last), `code_mode` (skip auto-capitalize + auto-period for dictating code), and `raw_mode` (return the verbatim transcript, bypassing every pass). Capitalization is sentence-aware: `_capitalize_sentences` uppercases the first letter and the start of each sentence (after `.`/`!`/`?` + space, or after a newline). `main.App._clean` passes the user's `config.json` values in, then runs the optional opt-in `ai_cleanup` pass on the result. Most of these are editable in the Settings dialog (Behavior tab: voice commands / code mode / raw mode + the AI-cleanup toggle; Text tab: extra fillers + dictionary); the rest remain config-file only.
 
 `paster.paste(text, preserve_clipboard=...)` optionally restores the caller's prior clipboard after a `RESTORE_DELAY_SEC` delay, but only on a successful paste (a failed paste leaves the dictated text in the clipboard). Default off until the restore timing is verified live — flipping the default risks the restore racing the target app's clipboard read.
 
@@ -91,9 +95,12 @@ States: `IDLE → RECORDING_HOLD → IDLE` (hold path) or `IDLE → RECORDING_TO
 ## Data Paths
 
 All data paths resolve through `paths.py` (single source of truth). Base dir is
-`VOICEFLOW_DATA_DIR` → `%LOCALAPPDATA%\VoiceFlow` → `<repo>/data` fallback. Modules
-import `paths` rather than computing `__file__`-relative paths. This keeps the app
-working when installed to read-only Program Files and when frozen by PyInstaller.
+`VOICEFLOW_DATA_DIR` → per-OS app-data dir (`%LOCALAPPDATA%\VoiceFlow` on Windows,
+`~/Library/Application Support/VoiceFlow` on macOS, `~/.local/share/VoiceFlow` on
+Linux) → `<repo>/data` fallback. Modules import `paths` rather than computing
+`__file__`-relative paths. This keeps the app working when installed to read-only
+Program Files and when frozen by PyInstaller. Start-on-login is likewise per-OS in
+`startup.py` (HKCU Run key / LaunchAgent / XDG autostart).
 
 ## Environment
 

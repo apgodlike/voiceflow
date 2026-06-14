@@ -1,10 +1,10 @@
 {
   "version": "0.3.1",
-  "description": "Free, open-source voice-to-text for Windows. Hold Ctrl+Alt, speak, release — cleaned text pastes at the cursor.",
+  "description": "Free, private, offline voice-to-text for Windows. 100% local (Parakeet/Whisper, no API key) or OpenAI cloud. Hold Ctrl+Alt, speak, release — cleaned text pastes at the cursor.",
   "homepage": "https://github.com/apgodlike/voiceflow",
   "license": "MIT",
   "notes": [
-    "VoiceFlow uses your own OpenAI API key. On first launch the Settings window opens — paste your key there.",
+    "On first launch a wizard sets up Local mode (no key, runs on your PC) or Cloud (your OpenAI key). Local downloads a model once.",
     "Usage: hold Ctrl+Alt and talk. Docs: https://github.com/apgodlike/voiceflow"
   ],
   "architecture": {
