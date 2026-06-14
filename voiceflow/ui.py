@@ -23,10 +23,15 @@ logger = logging.getLogger("voiceflow.ui")
 _COLORS = {"recording": "#e03030", "transcribing": "#e0a000", "idle": "#808080"}
 _MODELS = ["gpt-4o-mini-transcribe", "gpt-4o-transcribe"]
 _SYSTEM_DEFAULT_DEV = "System default"
+# Curated shortlist shown in the model dropdowns (settings + wizard). config.py
+# still accepts the full model set if a user hand-edits config.json; this is only
+# the menu of sensible choices: fast/balanced/max for English + two multilingual.
 _LOCAL_MODEL_SIZES = [
-    "tiny", "tiny.en", "base", "base.en", "small", "small.en",
-    "distil-small.en", "medium", "medium.en", "distil-medium.en",
-    "large", "distil-large-v3",
+    "distil-medium.en",  # recommended default — fast + good English accuracy
+    "distil-small.en",   # faster, lighter PCs
+    "distil-large-v3",   # max accuracy, slow on CPU
+    "small",             # multilingual (non-English)
+    "medium",            # multilingual, accurate, slower
 ]
 
 # ── animated overlay geometry ──────────────────────────────────────────────────
@@ -317,7 +322,7 @@ class UI:
         backend_var = tk.StringVar(value=self._cfg.get("backend", "openai"))
         key_var = tk.StringVar(value=self._cfg.get("openai_api_key", ""))
         model_var = tk.StringVar(value=self._cfg.get("model", _MODELS[0]))
-        local_model_var = tk.StringVar(value=self._cfg.get("local_model", "distil-small.en"))
+        local_model_var = tk.StringVar(value=self._cfg.get("local_model", "distil-medium.en"))
 
         ttk.Label(tab_api, text="Transcription backend").pack(anchor="w")
         _rb = ttk.Frame(tab_api)

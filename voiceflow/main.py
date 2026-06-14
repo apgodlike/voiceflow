@@ -110,7 +110,7 @@ class App:
         backend = self._cfg.get("backend", "openai")
         if backend == "local":
             from voiceflow import transcriber_local
-            model_name = self._cfg.get("local_model", "distil-small.en")
+            model_name = self._cfg.get("local_model", "distil-medium.en")
             if not transcriber_local.is_loaded():
                 self._ui.toast(f"Loading local Whisper model '{model_name}'…")
             return transcriber_local.transcribe(audio_path, language=language,
@@ -129,7 +129,7 @@ class App:
 
     def _preload_local_model(self) -> None:
         """Load the configured local model into RAM in the background on startup."""
-        model_name = self._cfg.get("local_model", "distil-small.en")
+        model_name = self._cfg.get("local_model", "distil-medium.en")
 
         def _load() -> None:
             try:
@@ -163,7 +163,7 @@ class App:
         self._apply_config_env()
         self._tray.set_backend(new_backend)
         if new_backend == "local":
-            model = self._cfg.get("local_model", "distil-small.en")
+            model = self._cfg.get("local_model", "distil-medium.en")
             self._ui.toast(f"Backend → local ({model})")
         else:
             self._ui.toast("Backend → openai")
@@ -348,7 +348,7 @@ class App:
             self._seg_paths = {}
         if self._cfg.get("backend") == "local":
             seg_min, seg_max = self._local_segment_ms(
-                self._cfg.get("local_model", "distil-small.en"))
+                self._cfg.get("local_model", "distil-medium.en"))
         else:
             seg_min, seg_max = recorder.SEGMENT_MIN_MS, recorder.SEGMENT_MAX_MS
         self._current_rid = recorder.start_recording(

@@ -6,6 +6,16 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.2.7] - 2026-06-14
+
+### Changed
+- Trimmed the local model dropdown to 5 curated choices (was 12): `distil-medium.en`
+  (recommended default), `distil-small.en`, `distil-large-v3`, and `small`/`medium`
+  for non-English. `config.json` still accepts any faster-whisper model if edited
+  by hand — this only declutters the menu.
+- Default local model is now `distil-medium.en` — the fast + accurate sweet spot
+  for English dictation (~3-4 s, flat regardless of recording length).
+
 ## [0.2.6] - 2026-06-14
 
 ### Changed

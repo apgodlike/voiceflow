@@ -60,14 +60,14 @@ MODEL_DESCS: dict[str, str] = {
     "tiny.en":          "Fastest, English only",
     "base":             "Fast, basic accuracy (multilingual)",
     "base.en":          "Fast, English only",
-    "small":            "Good accuracy (multilingual)",
-    "small.en":         "Recommended — English, good accuracy",
-    "distil-small.en":  "Distilled — English, faster than small.en",
-    "medium":           "High accuracy, needs 4 GB RAM, slow on CPU",
-    "medium.en":        "High accuracy, English, slow on CPU",
-    "distil-medium.en": "Distilled — English, faster than medium.en",
-    "large":            "Best accuracy, needs 8 GB RAM, 3-4x slow on CPU (multilingual)",
-    "distil-large-v3":  "Distilled large — English, near-large accuracy, ~2-4x faster",
+    "small":            "Multilingual — for non-English",
+    "small.en":         "English, good accuracy",
+    "distil-small.en":  "Faster, English — good for lighter PCs",
+    "medium":           "Multilingual, high accuracy — slower on CPU",
+    "medium.en":        "High accuracy, English",
+    "distil-medium.en": "Recommended — fast, English, great accuracy",
+    "large":            "Best accuracy, needs 8 GB RAM, slow on CPU (multilingual)",
+    "distil-large-v3":  "Max accuracy, English — slow on CPU (~15-20s)",
 }
 
 
