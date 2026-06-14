@@ -6,12 +6,18 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-06-14
+
 ### Changed
 - Raised the recording auto-stop cap from 10 → **30 minutes** (still a safety net
   against a forgotten toggle / stuck key; `max_recording_sec: 0` disables it).
-- README consistency: Parakeet latency stated once (~1 s), `local_model` default
-  documented as `parakeet`, and the comparison/features/architecture now mention
-  Parakeet and the pipx macOS/Linux path.
+- **Docs synced to the Parakeet-default reality.** The first-run wizard, README,
+  and config reference said "Local — Whisper" / "runs Whisper" even though
+  Parakeet is the default engine — now corrected throughout. `docs/privacy.md`
+  fixed its core claim: local mode (the default) sends **no audio** anywhere; only
+  cloud mode sends audio to OpenAI; documents the one-time model download and the
+  optional AI-cleanup data flow. The OpenAI-key guide notes a key is cloud-only;
+  ROADMAP marks Parakeet shipped; `CLAUDE.md` documents the three-backend dispatch.
 
 ## [0.3.0] - 2026-06-14
 
