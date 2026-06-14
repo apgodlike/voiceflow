@@ -9,3 +9,10 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+
+# Parakeet spike (throwaway, never shipped)
+venv-parakeet/
+
+# Parakeet eval outputs (generated)
+tools/eval_parakeet.txt
+tools/eval_whisper.txt
