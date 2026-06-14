@@ -44,11 +44,14 @@ _BAR_W = 3
 _BAR_GAP = 4
 _BARS_W = _BAR_COUNT * _BAR_W + (_BAR_COUNT - 1) * _BAR_GAP  # 27+32 = 59 px
 _OVERLAY_H = 44
-_OVERLAY_W = 110              # wide enough for pill proportions
-_PAD_X = (_OVERLAY_W - _BARS_W) // 2                          # center bars in pill
-_BAR_MAX_H = 28               # center bar max height
+_DOT_ZONE = 26               # left zone reserved for the red REC dot
+_OVERLAY_W = 132             # pill width (dot zone + centered bars)
+_PAD_X = _DOT_ZONE + (_OVERLAY_W - _DOT_ZONE - _BARS_W) // 2  # center bars right of the dot
+_DOT_CX = 16                 # REC dot center x
+_DOT_R = 5                   # REC dot base radius
+_BAR_MAX_H = 28              # center bar max height
 _BAR_MIN_H = 3
-_ANIM_MS = 40                 # 25 fps
+_ANIM_MS = 40                # 25 fps
 
 
 
@@ -238,6 +241,15 @@ class UI:
                 fill="#FFFFFF", outline="", tags="anim",
             )
 
+        # Pulsing red REC dot — the universal "recording" signal, so the state is
+        # unmistakable at a glance (left of the waveform).
+        pulse = 0.5 + 0.5 * math.sin(t * 4.0)
+        r = _DOT_R - 1 + pulse * 2  # gently breathe between 4 and 6 px
+        canvas.create_oval(
+            _DOT_CX - r, cy - r, _DOT_CX + r, cy + r,
+            fill="#ff453a", outline="", tags="anim",
+        )
+
     def _draw_transcribing_frame(self) -> None:
         """Slow traveling sine wave — calm 'thinking' state.
 
@@ -271,6 +283,14 @@ class UI:
                 x0, int(cy - h / 2), x0 + _BAR_W, int(cy + h / 2),
                 fill=color, outline="", tags="anim",
             )
+
+        # Dim amber dot in the REC-dot slot — reads as "processing" and keeps the
+        # pill layout consistent with the recording state.
+        r = _DOT_R - 1
+        canvas.create_oval(
+            _DOT_CX - r, cy - r, _DOT_CX + r, cy + r,
+            fill="#a06a00", outline="", tags="anim",
+        )
 
     # ── silent toast ──────────────────────────────────────────────────────────
 
@@ -502,6 +522,9 @@ class UI:
         code_var = tk.BooleanVar(value=bool(self._cfg.get("code_mode", False)))
         raw_var = tk.BooleanVar(value=bool(self._cfg.get("raw_mode", False)))
         preserve_var = tk.BooleanVar(value=bool(self._cfg.get("preserve_clipboard", False)))
+        ai_var = tk.BooleanVar(value=bool(self._cfg.get("ai_cleanup", False)))
+        ai_provider_var = tk.StringVar(value=self._cfg.get("ai_cleanup_provider", "ollama"))
+        ai_model_var = tk.StringVar(value=self._cfg.get("ai_cleanup_model", ""))
 
         ttk.Label(tab_beh, text="Paste method").pack(anchor="w")
         ttk.Combobox(
@@ -517,6 +540,25 @@ class UI:
         ttk.Checkbutton(tab_beh, text="Code mode (no auto-capitalize, no trailing period)", variable=code_var).pack(anchor="w")
         ttk.Checkbutton(tab_beh, text="Raw mode (verbatim transcript, skip all cleaning)", variable=raw_var).pack(anchor="w")
         ttk.Checkbutton(tab_beh, text="Preserve clipboard (restore prior clipboard after paste)", variable=preserve_var).pack(anchor="w")
+
+        ttk.Separator(tab_beh, orient="horizontal").pack(fill="x", pady=8)
+        ttk.Checkbutton(
+            tab_beh, text="AI cleanup — polish grammar/format with an LLM (slower)",
+            variable=ai_var,
+        ).pack(anchor="w")
+        _ai_row = ttk.Frame(tab_beh)
+        _ai_row.pack(anchor="w", pady=(2, 0))
+        ttk.Label(_ai_row, text="Provider:").pack(side="left")
+        ttk.Combobox(_ai_row, textvariable=ai_provider_var,
+                     values=["ollama", "openai"], state="readonly", width=10).pack(side="left", padx=(4, 12))
+        ttk.Label(_ai_row, text="Model:").pack(side="left")
+        ttk.Entry(_ai_row, textvariable=ai_model_var, width=18).pack(side="left", padx=(4, 0))
+        ttk.Label(
+            tab_beh,
+            text="  ollama — local & private (needs Ollama running); blank model = llama3.2\n"
+                 "  openai — uses your API key; blank model = gpt-4o-mini",
+            foreground="#666666", justify="left",
+        ).pack(anchor="w", pady=(2, 0))
 
         # ── Tab: Text ─────────────────────────────────────────────────────────
         tab_txt = ttk.Frame(nb, padding=12)
@@ -599,6 +641,9 @@ class UI:
                 code_mode=code_var.get(),
                 raw_mode=raw_var.get(),
                 preserve_clipboard=preserve_var.get(),
+                ai_cleanup=ai_var.get(),
+                ai_cleanup_provider=ai_provider_var.get(),
+                ai_cleanup_model=ai_model_var.get().strip(),
                 extra_fillers=extra_list,
                 dictionary=dict_val,
                 notifications_enabled=notif_var.get(),

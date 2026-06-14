@@ -41,6 +41,15 @@ Downloads the latest release and launches the installer.
 
 **Option C — Manual:** grab **`VoiceFlow-Setup.exe`** or the portable **`VoiceFlow-portable-*.zip`** from the [Releases page](https://github.com/apgodlike/voiceflow/releases) and run it.
 
+**Option D — pipx (any OS: Windows, macOS, Linux):**
+
+```bash
+pipx install "voiceflow-dictation[local]"   # [local] adds the offline Whisper + Parakeet engines
+voiceflow
+```
+
+Runs from source via Python — no installer, no SmartScreen prompt. Best path on macOS/Linux. (Use `[parakeet]`, `[whisper]`, or no extra for cloud-only.)
+
 > **SmartScreen note** — the installer is currently unsigned, so Windows shows "Windows protected your PC". Click **More info → Run anyway**. Scoop (Option A) skips this entirely. Code signing is planned; the source is fully auditable here.
 
 ### First launch
@@ -54,9 +63,19 @@ Then just hold **Ctrl + Alt** and talk. Switch modes anytime from the tray menu.
 
 ## Speed
 
-VoiceFlow transcribes in chunks *while you speak*, so on release only the last few seconds are left to process. **The wait is flat — independent of how long you dictated.**
+VoiceFlow transcribes in chunks *while you speak*, so on release only the last few seconds are left to process. **The wait is flat — under ~1 second, no matter how long you dictated.**
 
-On a typical modern multi-core laptop, local mode with the default model returns in **~3–4 seconds**, the same for a 10-second note or a 5-minute monologue. Exact speed depends on your CPU and chosen model (older / low-core machines are slower; cloud mode is faster still).
+Time from key-release to text on screen, default Parakeet engine ([details](docs/benchmarks.md)):
+
+| You spoke | Time to text |
+|---|---:|
+| 10 s | **0.6 s** |
+| 30 s | **0.9 s** |
+| 60 s | **0.9 s** |
+| 2 min | **1.0 s** |
+| 5 min | **~1.0 s** |
+
+<sub>Measured on a 6-core CPU (no GPU). It stays flat because chunks are transcribed during recording — only the final chunk runs on release. Numbers scale with your hardware.</sub>
 
 ## Local models
 
@@ -180,6 +199,9 @@ The first-run wizard sets up local or cloud mode. (For cloud, you can also add `
 | `language` | `""` | ISO-639-1 hint, e.g. `"en"`, `"hi"` — blank = auto |
 | `paste_mode` | `"clipboard"` | `"clipboard"` or `"type"` |
 | `preserve_clipboard` | `false` | Restore prior clipboard after paste |
+| `ai_cleanup` | `false` | Opt-in: polish the transcript with an LLM (grammar/format) |
+| `ai_cleanup_provider` | `"ollama"` | `"ollama"` (local, private) or `"openai"` (cloud) |
+| `ai_cleanup_model` | `""` | LLM model; blank = provider default (`llama3.2` / `gpt-4o-mini`) |
 | `max_recording_sec` | `600` | Auto-stop cap in seconds; `0` = no cap |
 | `voice_commands` | `false` | Spoken punctuation commands |
 | `code_mode` | `false` | No auto-cap / no trailing period |

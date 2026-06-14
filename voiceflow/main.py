@@ -222,8 +222,8 @@ class App:
             self._tray.set_failed_count(len(q.list_pending()))
 
     def _clean(self, raw: str) -> str:
-        """Apply the cleaner with the user's current config-driven options."""
-        return cleaner.clean(
+        """Apply the rule-based cleaner, then an optional opt-in LLM cleanup pass."""
+        cleaned = cleaner.clean(
             raw,
             dictionary=self._cfg.get("dictionary"),
             extra_fillers=self._cfg.get("extra_fillers"),
@@ -231,6 +231,10 @@ class App:
             code_mode=self._cfg.get("code_mode", False),
             raw_mode=self._cfg.get("raw_mode", False),
         )
+        if self._cfg.get("ai_cleanup"):
+            from voiceflow import ai_cleanup
+            cleaned = ai_cleanup.refine(cleaned, self._cfg)
+        return cleaned
 
     def _on_paste_success(self, cleaned: str) -> None:
         self._recent_texts.appendleft(cleaned)

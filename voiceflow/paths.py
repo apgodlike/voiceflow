@@ -24,9 +24,17 @@ def _base_dir() -> Path:
     override = os.environ.get("VOICEFLOW_DATA_DIR")
     if override:
         return Path(override)
-    local = os.environ.get("LOCALAPPDATA")
-    if local:
-        return Path(local) / _APP_NAME
+    if sys.platform == "win32":
+        local = os.environ.get("LOCALAPPDATA")
+        if local:
+            return Path(local) / _APP_NAME
+    elif sys.platform == "darwin":
+        return Path.home() / "Library" / "Application Support" / _APP_NAME
+    elif sys.platform.startswith("linux"):
+        xdg = os.environ.get("XDG_DATA_HOME")
+        base = Path(xdg) if xdg else Path.home() / ".local" / "share"
+        return base / _APP_NAME
+    # dev / CI fallback (and Windows without LOCALAPPDATA)
     return Path(__file__).resolve().parent.parent / "data"
 
 
