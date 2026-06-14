@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+- Raised the recording auto-stop cap from 10 → **30 minutes** (still a safety net
+  against a forgotten toggle / stuck key; `max_recording_sec: 0` disables it).
+- README consistency: Parakeet latency stated once (~1 s), `local_model` default
+  documented as `parakeet`, and the comparison/features/architecture now mention
+  Parakeet and the pipx macOS/Linux path.
+
 ## [0.3.0] - 2026-06-14
 
 ### Added

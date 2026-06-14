@@ -25,7 +25,7 @@ DEFAULTS: dict[str, Any] = {
     "code_mode": False,        # skip auto-capitalize + auto-period (dictating code)
     "raw_mode": False,         # deliver verbatim transcript, bypass the cleaner
     "preserve_clipboard": False,  # restore prior clipboard after paste (verify timing)
-    "max_recording_sec": 600,  # auto-stop a runaway recording at 10 min (0 = no cap)
+    "max_recording_sec": 1800,  # auto-stop a runaway recording at 30 min (0 = no cap)
     "language": "",             # ISO-639-1 hint for transcription (e.g. "en", "hi"); empty = auto
     "paste_mode": "clipboard",  # "clipboard" (Ctrl+V) or "type" (character-by-character)
     "input_device": None,       # sounddevice input device index; None = system default
