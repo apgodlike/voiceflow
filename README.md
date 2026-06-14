@@ -16,9 +16,9 @@ No subscription. No account. No API key. **Your voice never leaves your PC.**
 ## Why VoiceFlow
 
 - 🎙️ **Type with your voice anywhere** — email, chat, code editor, browser. If you can type in it, you can talk to it.
-- 🔒 **100% local & private** — local mode runs [Whisper](https://github.com/SYSTRAN/faster-whisper) on your own machine. No cloud, no account, **zero network calls**. Audio is deleted right after it's typed.
+- 🔒 **100% local & private** — local mode runs [Parakeet](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v2) or [Whisper](https://github.com/SYSTRAN/faster-whisper) on your own machine. No cloud, no account, **zero network calls**. Audio is deleted right after it's typed.
 - 💸 **Free forever** — open source (MIT). No subscription, no per-word billing. Wispr Flow is $14/month; VoiceFlow is $0.
-- ⚡ **Fast, and flat** — because it transcribes *while you speak*, text appears a few seconds after you release — **and that stays the same whether you talked for 5 seconds or 5 minutes.**
+- ⚡ **Fast, and flat** — because it transcribes *while you speak*, text appears about a second after you release — **and that stays the same whether you talked for 5 seconds or 5 minutes.**
 - 🧹 **Clean output** — strips "um / uh / you know", auto-capitalizes and punctuates, fixes your jargon with a custom dictionary.
 - ☁️ **Or use the cloud** — prefer OpenAI's API? Paste a key and get near-instant results. Your choice, switch anytime.
 
@@ -58,7 +58,7 @@ Runs from source via Python — no installer, no SmartScreen prompt. Best path o
 
 A short wizard opens — pick one:
 
-- **Local — Whisper** (recommended): no key, no cost, fully offline. Pick a model and it downloads once (145 MB–1.5 GB). Done.
+- **Local** (recommended): no key, no cost, fully offline — runs **Parakeet** (default) or Whisper on your PC. Pick a model; it downloads once (~330 MB–1.5 GB). Done.
 - **Cloud — OpenAI**: paste your API key ([how to get one](docs/getting-an-openai-api-key.md)). Faster, costs a few cents per session.
 
 Then just hold **Ctrl + Alt** and talk. Switch modes anytime from the tray menu.
@@ -81,7 +81,7 @@ Time from key-release to text on screen, default Parakeet engine ([details](docs
 
 ## Local models
 
-Choose in the first-run wizard or Settings. English-only models are faster *and* more accurate for English; "distil" models are distilled for extra speed.
+Choose in the first-run wizard or Settings. **Parakeet** is the default English engine; the Whisper models below cover other languages and special cases. (For Whisper, English-only `.en` models are faster and more accurate for English, and `distil` models are distilled for extra speed.)
 
 | Model | Best for | Speed* | Download |
 |-------|----------|--------|----------|
@@ -137,7 +137,7 @@ Open from the tray (**Settings…**) or the main window.
 
 | Tab | Configure |
 |-----|-----------|
-| **API** | Backend (Local Whisper / OpenAI): local model download & remove, or OpenAI key + cloud model |
+| **API** | Backend (Local Parakeet/Whisper, or OpenAI): local model download & remove, or OpenAI key + cloud model |
 | **Recording** | Input device (mic picker), language hint |
 | **Behavior** | Paste method, voice commands, code mode, raw mode, preserve clipboard |
 | **Text** | Extra fillers to strip, custom dictionary (spoken word → replacement) |
@@ -194,7 +194,7 @@ The first-run wizard sets up local or cloud mode. (For cloud, you can also add `
 
 | Key | Default | Description |
 |-----|---------|-------------|
-| `backend` | wizard-set (**Local** recommended) | `"local"` (offline Whisper) or `"openai"` (cloud). The first-run wizard sets this; `"openai"` is only the bare fallback when no wizard has run and the key is unset. |
+| `backend` | wizard-set (**Local** recommended) | `"local"` (offline Parakeet/Whisper) or `"openai"` (cloud). The first-run wizard sets this; `"openai"` is only the bare fallback when no wizard has run and the key is unset. |
 | `local_model` | `"parakeet"` | Local engine: `"parakeet"` (default) or a Whisper model (see table above) |
 | `openai_api_key` | `""` | API key for cloud mode (fallback: `OPENAI_API_KEY` env var) |
 | `model` | `gpt-4o-mini-transcribe` | Cloud transcription model |
