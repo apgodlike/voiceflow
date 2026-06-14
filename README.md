@@ -41,6 +41,15 @@ Downloads the latest release and launches the installer.
 
 **Option C — Manual:** grab **`VoiceFlow-Setup.exe`** or the portable **`VoiceFlow-portable-*.zip`** from the [Releases page](https://github.com/apgodlike/voiceflow/releases) and run it.
 
+**Option D — pipx (any OS: Windows, macOS, Linux):**
+
+```bash
+pipx install "voiceflow-dictation[local]"   # [local] adds the offline Whisper + Parakeet engines
+voiceflow
+```
+
+Runs from source via Python — no installer, no SmartScreen prompt. Best path on macOS/Linux. (Use `[parakeet]`, `[whisper]`, or no extra for cloud-only.)
+
 > **SmartScreen note** — the installer is currently unsigned, so Windows shows "Windows protected your PC". Click **More info → Run anyway**. Scoop (Option A) skips this entirely. Code signing is planned; the source is fully auditable here.
 
 ### First launch
@@ -188,6 +197,9 @@ The first-run wizard sets up local or cloud mode. (For cloud, you can also add `
 | `language` | `""` | ISO-639-1 hint, e.g. `"en"`, `"hi"` — blank = auto |
 | `paste_mode` | `"clipboard"` | `"clipboard"` or `"type"` |
 | `preserve_clipboard` | `false` | Restore prior clipboard after paste |
+| `ai_cleanup` | `false` | Opt-in: polish the transcript with an LLM (grammar/format) |
+| `ai_cleanup_provider` | `"ollama"` | `"ollama"` (local, private) or `"openai"` (cloud) |
+| `ai_cleanup_model` | `""` | LLM model; blank = provider default (`llama3.2` / `gpt-4o-mini`) |
 | `max_recording_sec` | `600` | Auto-stop cap in seconds; `0` = no cap |
 | `voice_commands` | `false` | Spoken punctuation commands |
 | `code_mode` | `false` | No auto-cap / no trailing period |

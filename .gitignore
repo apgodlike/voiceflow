@@ -16,3 +16,8 @@ venv-parakeet/
 # Parakeet eval outputs (generated)
 tools/eval_parakeet.txt
 tools/eval_whisper.txt
+
+# Python packaging build output
+dist_pkg/
+*.egg-info/
+build/
