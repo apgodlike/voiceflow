@@ -6,16 +6,18 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
-## [0.2.4] - 2026-06-14
+## [0.2.5] - 2026-06-14
 
 ### Changed
-- **Local backend is now 4-6x faster**: it transcribes the whole recording in a
-  single pass instead of per-segment. Whisper's encoder always runs a full 30 s
-  window per call, so the segment fast-path (built for the parallel OpenAI API)
-  made local re-pay that fixed cost on every short segment — a 25 s dictation
-  cost ~6x the encoder tax. The single pass also produces one coherent transcript,
-  fixing false sentence breaks at speech pauses. The OpenAI backend is unchanged
-  (still segments, since its calls are network-bound and parallelize).
+- **Local transcription latency is now flat (~3-4 s) regardless of recording
+  length.** Whisper's encoder always runs a full ~30 s window per call, so many
+  tiny silence-cut segments each re-paid that fixed cost (a 25 s dictation could
+  take ~20 s+). Local now uses larger ~12-15 s chunks transcribed *during*
+  recording: each chunk amortizes the encoder cost and processes ~4-5x faster
+  than real time, so it keeps pace with speech and only the final chunk is left
+  to process on release. Measured post-release wait: ~3.6 s for a 10 s, 60 s, or
+  3-minute recording alike (distil-medium.en on a 6-core CPU). The OpenAI backend
+  keeps smaller chunks (network-bound, parallelizes).
 - Local inference pins CTranslate2 to physical cores instead of its auto setting,
   which over-subscribes hyper-threaded CPUs (~15% faster in testing).
 - Default local model is now `distil-small.en` (fast + good English accuracy);

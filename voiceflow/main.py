@@ -236,22 +236,17 @@ class App:
     def _on_segment(self, index: int, path: Path) -> None:
         """A segment closed mid-recording — start transcribing it now.
 
-        Only the OpenAI backend uses the per-segment fast-path: those calls are
-        network-bound and parallelize, so transcribing during recording cuts
-        latency. The local Whisper backend does the opposite — its encoder runs
-        a full 30 s window per call, so each short segment re-pays that fixed
-        cost. Local therefore transcribes the whole file once on stop (see
-        ``_finalize_local``); here we only track the segment path for cleanup.
+        Both backends transcribe segments *during* recording so the work
+        overlaps speech and only the final chunk is left on release. The segment
+        size is tuned per backend in ``_on_start``: the local Whisper encoder
+        runs a fixed ~30 s window per call, so local uses larger chunks (~12-15 s)
+        to amortize that cost; OpenAI uses smaller chunks for more parallelism.
         """
         try:
             if path.stat().st_size < self._MIN_SEGMENT_BYTES:
                 path.unlink(missing_ok=True)
                 return
         except OSError:
-            return
-        if self._cfg.get("backend") == "local":
-            with self._seg_lock:
-                self._seg_paths[index] = path
             return
         lang = self._cfg.get("language") or None
         fut = self._executor.submit(self._transcribe, path, lang)
@@ -300,16 +295,6 @@ class App:
             self._set_state("idle")
             self._tray.set_failed_count(len(q.list_pending()))
 
-    def _finalize_local(self, rid: str, full_path: Path,
-                        seg_paths: dict[int, Path]) -> None:
-        """Local backend: one transcription of the whole file (no segment
-        stitching). Avoids the per-segment 30 s encoder tax and yields a single
-        coherent transcript (no false sentence breaks at pauses)."""
-        try:
-            self._process_job(rid, full_path)
-        finally:
-            self._cleanup_segments(seg_paths)
-
     @staticmethod
     def _cleanup_segments(seg_paths: dict[int, Path]) -> None:
         for p in seg_paths.values():
@@ -338,14 +323,27 @@ class App:
         self._ui.toast(f"Recording stopped — {secs // 60} min limit. Start again to continue.")
         self._on_stop()
 
+    # Local Whisper pays a fixed ~30 s-window encoder cost per call, so it needs
+    # chunks big enough to amortize it (each ~12-15 s chunk transcribes in ~4 s,
+    # keeping up with speech 4-5x over). The OpenAI backend is network-bound and
+    # parallelizes, so smaller chunks cut latency there.
+    _LOCAL_SEGMENT_MIN_MS = 12000
+    _LOCAL_SEGMENT_MAX_MS = 15000
+
     def _on_start(self) -> None:
         with self._seg_lock:
             self._seg_futures = {}
             self._seg_paths = {}
+        if self._cfg.get("backend") == "local":
+            seg_min, seg_max = self._LOCAL_SEGMENT_MIN_MS, self._LOCAL_SEGMENT_MAX_MS
+        else:
+            seg_min, seg_max = recorder.SEGMENT_MIN_MS, recorder.SEGMENT_MAX_MS
         self._current_rid = recorder.start_recording(
             on_segment=self._on_segment,
             device=self._cfg.get("input_device"),
             on_rms=self._on_rms_update,
+            segment_min_ms=seg_min,
+            segment_max_ms=seg_max,
         )
         logger.info("Recording started: %s", self._current_rid)
         self._set_state("recording")
@@ -365,12 +363,8 @@ class App:
             seg_paths = dict(self._seg_paths)
         q.enqueue(rid, full)  # durable fallback unit
         self._set_state("transcribing")
-        if self._cfg.get("backend") == "local":
-            target, args = self._finalize_local, (rid, full, seg_paths)
-        else:
-            target, args = self._finalize_job, (rid, full, futures, seg_paths)
         threading.Thread(
-            target=target, args=args,
+            target=self._finalize_job, args=(rid, full, futures, seg_paths),
             daemon=True, name=f"finalize-{rid[:8]}",
         ).start()
 

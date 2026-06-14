@@ -109,6 +109,8 @@ def start_recording(
     on_segment: OnSegment | None = None,
     device: int | str | None = None,
     on_rms: OnRms | None = None,
+    segment_min_ms: int = SEGMENT_MIN_MS,
+    segment_max_ms: int = SEGMENT_MAX_MS,
 ) -> str:
     RECORDINGS_DIR.mkdir(parents=True, exist_ok=True)
     recording_id = uuid4().hex
@@ -127,7 +129,8 @@ def start_recording(
         "seg_path": seg_path,
         "seg_index": 0,
         "seg_frames": 0,
-        "cutter": _SegmentCutter(),
+        "cutter": _SegmentCutter(segment_min_ms=segment_min_ms,
+                                 segment_max_ms=segment_max_ms),
         "on_segment": on_segment,
         "on_rms": on_rms,
     }
