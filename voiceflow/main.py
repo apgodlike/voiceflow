@@ -98,23 +98,40 @@ class App:
             os.environ["OPENAI_API_KEY"] = key
         os.environ["VOICEFLOW_MODEL"] = config.resolved_model(self._cfg)
         transcriber.reset_client()  # key/model may have changed — rebuild lazily
-        if self._cfg.get("backend", "openai") == "openai":
-            try:
-                from voiceflow import transcriber_local
+        # Drop whichever local engine isn't the active one (free its RAM).
+        backend = self._cfg.get("backend", "openai")
+        active = self._cfg.get("local_model", "parakeet") if backend == "local" else None
+        try:
+            from voiceflow import transcriber_local
+            if active is None or active == "parakeet":
                 transcriber_local.reset_model()
-            except ImportError:
-                pass
+        except ImportError:
+            pass
+        try:
+            from voiceflow import transcriber_parakeet
+            if active is None or active != "parakeet":
+                transcriber_parakeet.reset_model()
+        except ImportError:
+            pass
 
     def _transcribe(self, audio_path: Path, language: str | None = None) -> str:
-        """Dispatch transcription to openai or local backend per config."""
+        """Dispatch transcription to the cloud (OpenAI) or a local engine per config.
+
+        Local has two engines, chosen by ``local_model``: ``"parakeet"`` (onnx-asr,
+        the default English engine) or any faster-whisper model name.
+        """
         backend = self._cfg.get("backend", "openai")
         if backend == "local":
-            from voiceflow import transcriber_local
-            model_name = self._cfg.get("local_model", "distil-medium.en")
-            if not transcriber_local.is_loaded():
-                self._ui.toast(f"Loading local Whisper model '{model_name}'…")
-            return transcriber_local.transcribe(audio_path, language=language,
-                                                model_name=model_name)
+            model_name = self._cfg.get("local_model", "parakeet")
+            if model_name == "parakeet":
+                from voiceflow import transcriber_parakeet as engine
+                label = "Parakeet"
+            else:
+                from voiceflow import transcriber_local as engine
+                label = f"Whisper '{model_name}'"
+            if not engine.is_loaded():
+                self._ui.toast(f"Loading local model ({label})…")
+            return engine.transcribe(audio_path, language=language, model_name=model_name)
         return transcriber.transcribe(audio_path, language=language)
 
     def _on_setup_complete(self, cfg: dict) -> None:
@@ -129,15 +146,20 @@ class App:
 
     def _preload_local_model(self) -> None:
         """Load the configured local model into RAM in the background on startup."""
-        model_name = self._cfg.get("local_model", "distil-medium.en")
+        model_name = self._cfg.get("local_model", "parakeet")
 
         def _load() -> None:
             try:
-                from voiceflow import transcriber_local
-                if not transcriber_local.is_loaded():
-                    logger.info("Preloading local model '%s'…", model_name)
-                    transcriber_local._load_model(model_name)
-                    logger.info("Local model '%s' ready.", model_name)
+                logger.info("Preloading local model '%s'…", model_name)
+                if model_name == "parakeet":
+                    from voiceflow import transcriber_parakeet as engine
+                    if not engine.is_loaded():
+                        engine._load_model()
+                else:
+                    from voiceflow import transcriber_local as engine
+                    if not engine.is_loaded():
+                        engine._load_model(model_name)
+                logger.info("Local model '%s' ready.", model_name)
             except Exception as exc:
                 logger.warning("Local model preload failed: %s", exc)
 
@@ -163,7 +185,7 @@ class App:
         self._apply_config_env()
         self._tray.set_backend(new_backend)
         if new_backend == "local":
-            model = self._cfg.get("local_model", "distil-medium.en")
+            model = self._cfg.get("local_model", "parakeet")
             self._ui.toast(f"Backend → local ({model})")
         else:
             self._ui.toast("Backend → openai")
@@ -348,7 +370,7 @@ class App:
             self._seg_paths = {}
         if self._cfg.get("backend") == "local":
             seg_min, seg_max = self._local_segment_ms(
-                self._cfg.get("local_model", "distil-medium.en"))
+                self._cfg.get("local_model", "parakeet"))
         else:
             seg_min, seg_max = recorder.SEGMENT_MIN_MS, recorder.SEGMENT_MAX_MS
         self._current_rid = recorder.start_recording(

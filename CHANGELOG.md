@@ -6,6 +6,26 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-06-14
+
+### Added
+- **Parakeet local engine** — NVIDIA Parakeet-TDT-0.6B (via `onnx-asr` +
+  `onnxruntime`, no PyTorch/NeMo, +42 MB) is the new **default** English engine.
+  Unlike Whisper it has no fixed encoder window, so a 30 s clip transcribes in
+  ~2 s with no per-call floor — fast even throttled to 2 cores (~2.75 s) — and it
+  stays *silent* on background noise/silence instead of hallucinating text. On the
+  maintainer's real accented recordings it beat `distil-medium.en` on both words
+  and punctuation. English-only; Whisper `small`/`medium` remain for other
+  languages. Downloads the ~660 MB int8 model on first use; ~760 MB RAM.
+
+### Changed
+- Default local model is now `parakeet`; the local model dropdown lists it first,
+  with the Whisper models below.
+
+### Notes
+- Parakeet weights are © NVIDIA, licensed CC-BY-4.0 (attribution in `NOTICE` and
+  the README). VoiceFlow and all libraries remain MIT.
+
 ## [0.2.7] - 2026-06-14
 
 ### Changed

@@ -27,11 +27,12 @@ _SYSTEM_DEFAULT_DEV = "System default"
 # still accepts the full model set if a user hand-edits config.json; this is only
 # the menu of sensible choices: fast/balanced/max for English + two multilingual.
 _LOCAL_MODEL_SIZES = [
-    "distil-medium.en",  # recommended default — fast + good English accuracy
-    "distil-small.en",   # faster, lighter PCs
-    "distil-large-v3",   # max accuracy, slow on CPU
-    "small",             # multilingual (non-English)
-    "medium",            # multilingual, accurate, slower
+    "parakeet",          # recommended default — fastest + most accurate English (onnx)
+    "distil-medium.en",  # Whisper: fast + good English accuracy
+    "distil-small.en",   # Whisper: faster, lighter PCs
+    "distil-large-v3",   # Whisper: max accuracy, slow on CPU
+    "small",             # Whisper multilingual (non-English)
+    "medium",            # Whisper multilingual, accurate, slower
 ]
 
 # ── animated overlay geometry ──────────────────────────────────────────────────
@@ -322,7 +323,7 @@ class UI:
         backend_var = tk.StringVar(value=self._cfg.get("backend", "openai"))
         key_var = tk.StringVar(value=self._cfg.get("openai_api_key", ""))
         model_var = tk.StringVar(value=self._cfg.get("model", _MODELS[0]))
-        local_model_var = tk.StringVar(value=self._cfg.get("local_model", "distil-medium.en"))
+        local_model_var = tk.StringVar(value=self._cfg.get("local_model", "parakeet"))
 
         ttk.Label(tab_api, text="Transcription backend").pack(anchor="w")
         _rb = ttk.Frame(tab_api)

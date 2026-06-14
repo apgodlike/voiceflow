@@ -64,14 +64,17 @@ Choose in the first-run wizard or Settings. English-only models are faster *and*
 
 | Model | Best for | Speed* | Download |
 |-------|----------|--------|----------|
-| **distil-medium.en** | **Recommended** — English, fast + accurate | ~3–4 s | 790 MB |
-| distil-small.en | Older / low-core PCs, max speed | ~2 s | 330 MB |
-| distil-large-v3 | Highest accuracy (slow on CPU) | ~15–20 s | 1.5 GB |
-| small / medium | Other languages (multilingual) | ~3–6 s | 485 MB / 1.5 GB |
+| **Parakeet** | **Recommended** — English. Fastest + most accurate, no GPU needed | ~2 s (30 s clip) | 660 MB |
+| distil-medium.en | English (Whisper), fast + accurate | ~3–4 s | 790 MB |
+| distil-small.en | Older / low-core PCs (Whisper) | ~2 s | 330 MB |
+| distil-large-v3 | Whisper max accuracy (slow on CPU) | ~15–20 s | 1.5 GB |
+| small / medium | Other languages (multilingual Whisper) | ~3–6 s | 485 MB / 1.5 GB |
 
-<sub>*Flat post-release wait on a 6-core CPU; scales with your hardware. Models download once and run offline forever after.</sub>
+<sub>*Post-release wait on a 6-core CPU; scales with your hardware. Models download once and run offline forever after.</sub>
 
-> On a CPU (no GPU), Whisper *large* models have a fixed ~12.5 s cost per call — great accuracy, but not real-time. **`distil-medium.en` is the sweet spot for everyday dictation.**
+> **Parakeet** ([NVIDIA Parakeet-TDT-0.6B](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v2)) is the default for English: no per-call encoder floor, stays accurate even on a 2-core CPU, and stays *silent* on background noise instead of inventing text. It's English-only — pick a multilingual Whisper model (`small`/`medium`) for other languages. On a CPU, Whisper *large* models have a fixed ~12.5 s cost per call (great accuracy, not real-time).
+>
+> <sub>Parakeet model weights © NVIDIA, licensed [CC-BY-4.0](https://creativecommons.org/licenses/by/4.0/). See [NOTICE](NOTICE).</sub>
 
 ## VoiceFlow vs Wispr Flow
 

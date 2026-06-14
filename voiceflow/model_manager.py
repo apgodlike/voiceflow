@@ -7,16 +7,15 @@ logger = logging.getLogger("voiceflow.model_manager")
 
 
 def recommended_model() -> str:
-    """Pick a sensible default local model from CPU core count.
+    """The default local model offered by the first-run wizard.
 
-    ``medium`` needs ~4 GB RAM and is only real-time on a capable multi-core
-    machine; on a weak CPU it backlogs behind speech and pastes late. ``small.en``
-    is fast everywhere. We key off the logical core count: 8+ -> medium.en,
-    otherwise small.en. English-only (.en) covers the common case; users pick a
-    multilingual model in the wizard if they need other languages.
+    Parakeet has no encoder floor and stays fast even throttled to 2 threads
+    (30 s clip ~2.75 s), with better English accuracy than Whisper and no
+    hallucination on silence, so it's the default English engine regardless of
+    core count. Users pick a multilingual Whisper model in the wizard if they
+    need other languages.
     """
-    cores = os.cpu_count() or 2
-    return "distil-medium.en" if cores >= 8 else "distil-small.en"
+    return "parakeet"
 
 # ".en" variants are English-only: same size, faster and more accurate than the
 # multilingual model of the same size (no 99-language baggage). Multilingual
@@ -38,7 +37,16 @@ MODEL_REPOS: dict[str, str] = {
     "distil-medium.en": "Systran/faster-distil-whisper-medium.en",
     "large":            "Systran/faster-whisper-large-v3",
     "distil-large-v3":  "Systran/faster-distil-whisper-large-v3",
+    # Parakeet is a different engine (onnx-asr), not a faster-whisper alias.
+    "parakeet":         "istupakov/parakeet-tdt-0.6b-v2-onnx",
 }
+
+# Parakeet ships fp32 (~2.4 GB) and int8 (~660 MB) variants in one repo. We only
+# use the int8 weights, so download just these files instead of the whole repo.
+PARAKEET_INT8_FILES = [
+    "config.json", "vocab.txt", "nemo128.onnx",
+    "encoder-model.int8.onnx", "decoder_joint-model.int8.onnx",
+]
 
 MODEL_SIZES: dict[str, str] = {
     "tiny":             "75 MB",
@@ -53,6 +61,7 @@ MODEL_SIZES: dict[str, str] = {
     "distil-medium.en": "790 MB",
     "large":            "3 GB",
     "distil-large-v3":  "1.5 GB",
+    "parakeet":         "660 MB",
 }
 
 MODEL_DESCS: dict[str, str] = {
@@ -65,9 +74,10 @@ MODEL_DESCS: dict[str, str] = {
     "distil-small.en":  "Faster, English — good for lighter PCs",
     "medium":           "Multilingual, high accuracy — slower on CPU",
     "medium.en":        "High accuracy, English",
-    "distil-medium.en": "Recommended — fast, English, great accuracy",
+    "distil-medium.en": "Fast, English, great accuracy",
     "large":            "Best accuracy, needs 8 GB RAM, slow on CPU (multilingual)",
     "distil-large-v3":  "Max accuracy, English — slow on CPU (~15-20s)",
+    "parakeet":         "Recommended — fastest + most accurate English (no GPU needed)",
 }
 
 
@@ -75,9 +85,11 @@ def is_cached(model_name: str) -> bool:
     """Return True if the model is already in the HuggingFace cache."""
     try:
         from huggingface_hub import try_to_load_from_cache
+        # faster-whisper repos carry model.bin; Parakeet's marker is its int8 encoder.
+        filename = "encoder-model.int8.onnx" if model_name == "parakeet" else "model.bin"
         result = try_to_load_from_cache(
             repo_id=MODEL_REPOS.get(model_name, ""),
-            filename="model.bin",
+            filename=filename,
         )
         return isinstance(result, str)
     except Exception:
@@ -118,7 +130,11 @@ def download(model_name: str, on_progress: Callable[[int, int], None]) -> None:
     """
     from huggingface_hub import hf_hub_download, list_repo_files
     repo_id = MODEL_REPOS[model_name]
-    files = list(list_repo_files(repo_id))
+    # Parakeet: fetch only the int8 weights, not the 2.4 GB fp32 variant.
+    if model_name == "parakeet":
+        files = PARAKEET_INT8_FILES
+    else:
+        files = list(list_repo_files(repo_id))
     total = len(files)
     for i, filename in enumerate(files):
         hf_hub_download(repo_id=repo_id, filename=filename)

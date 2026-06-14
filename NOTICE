@@ -1,0 +1,30 @@
+VoiceFlow — third-party model and library attributions
+=======================================================
+
+VoiceFlow itself is licensed under the MIT License (see LICENSE).
+
+It can download and run the following third-party speech-recognition models at
+the user's choice. Model weights are downloaded on demand and are NOT distributed
+with VoiceFlow; the licenses below govern the weights when used.
+
+NVIDIA Parakeet-TDT-0.6B-v2 (default local English engine)
+----------------------------------------------------------
+  Model:    nvidia/parakeet-tdt-0.6b-v2
+  License:  Creative Commons Attribution 4.0 International (CC-BY-4.0)
+            https://creativecommons.org/licenses/by/4.0/
+  Copyright (c) NVIDIA Corporation.
+  ONNX conversion used: istupakov/parakeet-tdt-0.6b-v2-onnx
+  Required attribution: this product uses NVIDIA's Parakeet-TDT-0.6B-v2 model,
+  licensed CC-BY-4.0. No modifications are made to the model weights.
+
+OpenAI Whisper / Distil-Whisper (optional local engine, via faster-whisper)
+---------------------------------------------------------------------------
+  Models:   Systran/faster-whisper-*, Systran/faster-distil-whisper-*
+  License:  MIT (Whisper, Distil-Whisper, faster-whisper, CTranslate2)
+
+Libraries
+---------
+  onnx-asr           — MIT License
+  onnxruntime        — MIT License
+  faster-whisper     — MIT License
+  CTranslate2        — MIT License
