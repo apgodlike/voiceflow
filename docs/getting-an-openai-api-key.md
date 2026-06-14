@@ -1,8 +1,9 @@
 # Getting an OpenAI API key
 
-VoiceFlow uses OpenAI to turn your speech into text, so you need your own OpenAI
-API key. You pay OpenAI directly for what you use (transcription is cheap — see
-the cost note at the bottom). This takes about 5 minutes.
+VoiceFlow works fully offline with **no key** by default (local Parakeet/Whisper).
+This guide is **only if you chose Cloud mode**, which uses OpenAI to transcribe and
+needs your own API key. You pay OpenAI directly for what you use (transcription is
+cheap — see the cost note at the bottom). This takes about 5 minutes.
 
 > Screenshots: replace the `![...]()` placeholders below with your own screenshots
 > before publishing the release.

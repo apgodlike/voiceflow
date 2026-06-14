@@ -41,16 +41,17 @@ python -m voiceflow.transcriber path/to/file.ogg  # needs OPENAI_API_KEY
 The pipeline is strictly linear — each stage hands off to the next via `main.py`:
 
 ```
-hotkey.py → recorder.py → queue.py → transcriber.py → cleaner.py → paster.py → queue.py (mark_success)
+hotkey.py → recorder.py → queue.py → transcribe* → cleaner.py → paster.py → queue.py (mark_success)
+            (* App._transcribe dispatches: transcriber_parakeet | transcriber_local | transcriber [openai])
 ```
 
 **Key design constraints:**
 
 1. **Audio written to disk during recording** — `recorder.py` uses `soundfile.SoundFile` in write mode (OGG/Vorbis) and flushes each chunk in the `sounddevice` callback. Do not buffer audio in memory.
 
-2. **Segmented fast-path with full-file fallback (latency)** — recorder writes the **full** continuous OGG (`{rid}.ogg`, the durable unit) *plus* rolling **segment** files (`{rid}.seg{n}.ogg`) cut on silence by `_SegmentCutter`. Each closed segment fires `on_segment`, so `main.py` transcribes segments concurrently *during* recording; on stop it stitches results in index order and pastes. If any segment transcription fails, it discards the partial and falls back to transcribing the full file via the queue path. Cuts land only inside silence gaps → no spoken word spans a boundary → plain concatenation, no overlap/dedup. The queue/retry/privacy model operates only on the full file; segments are ephemeral and always deleted after finalize. A `threading.Timer` (`App._start_max_timer`) auto-stops a runaway recording at `config.max_recording_sec` (default 600 s; 0 disables) and toasts the user to restart; it is cancelled on normal stop and shutdown.
+2. **Segmented fast-path with full-file fallback (latency)** — recorder writes the **full** continuous OGG (`{rid}.ogg`, the durable unit) *plus* rolling **segment** files (`{rid}.seg{n}.ogg`) cut on silence by `_SegmentCutter`. Each closed segment fires `on_segment`, so `main.py` transcribes segments concurrently *during* recording; on stop it stitches results in index order and pastes. If any segment transcription fails, it discards the partial and falls back to transcribing the full file via the queue path. Cuts land only inside silence gaps → no spoken word spans a boundary → plain concatenation, no overlap/dedup. The queue/retry/privacy model operates only on the full file; segments are ephemeral and always deleted after finalize. A `threading.Timer` (`App._start_max_timer`) auto-stops a runaway recording at `config.max_recording_sec` (default 1800 s / 30 min; 0 disables) and toasts the user to restart; it is cancelled on normal stop and shutdown. Segment min/max length is tuned per backend/model in `App._on_start` (larger chunks for heavier models so the pipeline keeps pace).
 
-3. **No retry logic in `transcriber.py`** — it raises `TranscriptionError` on any failure. Retries are owned entirely by `queue.py` + the sweeper in `main.py`. The module caches one `OpenAI` client (connection reuse); `reset_client()` drops it after a key/model change.
+3. **Three transcription backends, dispatched in `App._transcribe()`** — by config: cloud `transcriber.py` (OpenAI), or local `transcriber_parakeet.py` (Parakeet via onnx-asr — the **default** English engine) / `transcriber_local.py` (faster-whisper). None retry: each raises `TranscriptionError`; retries are owned by `queue.py` + the sweeper in `main.py`. The OpenAI module caches one client (`reset_client()`); the local engines each cache one loaded model (`reset_model()`), and `_apply_config_env` drops the inactive engine to free RAM. An optional opt-in `ai_cleanup.py` pass (local Ollama or OpenAI) runs after `cleaner.py` and **fails open** — any error returns the rule-cleaned text.
 
 4. **Clipboard always set before paste** — `paster.paste()` calls `pyperclip.copy()` unconditionally before attempting `pyautogui.hotkey()`. If pyautogui fails, the function logs a warning and returns `False`; caller must not treat this as fatal.
 
@@ -96,7 +97,7 @@ working when installed to read-only Program Files and when frozen by PyInstaller
 
 ## Environment
 
-- `OPENAI_API_KEY` — required for transcription
+- `OPENAI_API_KEY` — required only for cloud (OpenAI) mode; local mode (Parakeet/Whisper, the default) needs no key
 - `VOICEFLOW_HOTKEY` — optional, default `ctrl+alt`
 - `VOICEFLOW_MODEL` — optional, default `gpt-4o-mini-transcribe`
 - `VOICEFLOW_DATA_DIR` — optional, overrides the data base dir

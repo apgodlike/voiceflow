@@ -18,14 +18,23 @@ Living doc of what's done, what's next, and known limits. Updated 2026-06-14.
   remove-downloaded-model from Settings, physical-core thread pinning.
 - Fixes: windowed-build `NoneType.write` download crash; double-paste safety.
 
-## In review — Parakeet local engine (PR on `feature/local-model`, v0.3.0)
+## Shipped — v0.3.0 (Parakeet engine + cross-platform + AI cleanup)
 
-Spike + validation **passed**: Parakeet-TDT-0.6B (onnx-asr/onnxruntime, +42 MB)
-has no encoder floor (30 s → ~2 s, ~2.75 s even on 2 threads), beat
-`distil-medium.en` on real accented audio, stays silent on noise, 760 MB RAM with
-int8. Integrated as the **default English engine** (a model choice in the Local
-backend); Whisper kept for multilingual/noisy. CC-BY-4.0 attribution in `NOTICE`.
-Pending: clean-machine packaging test + first-run UX polish (below).
+- **Parakeet-TDT-0.6B** (onnx-asr/onnxruntime, +42 MB) is the **default English
+  engine** — no encoder floor (30 s → ~2 s; ~1 s post-release with chunking), beat
+  `distil-medium.en` on real accented audio, stays silent on noise, 760 MB RAM
+  (int8). Whisper `small`/`medium` kept for other languages. CC-BY-4.0 attribution
+  in `NOTICE`.
+- **pipx cross-platform install** — `pipx install "voiceflow-dictation[local]"`
+  on Windows/macOS/Linux; the Windows `.exe`/Scoop build is unchanged. Added
+  macOS/Linux data-dir + start-on-login support.
+- **Optional AI text cleanup** (opt-in, local Ollama or OpenAI; fails open).
+- Red REC indicator on the overlay; latency benchmark + `docs/benchmarks.md`;
+  recording cap raised to 30 min.
+- Landing page at https://apgodlike.github.io/voiceflow/.
+
+Pending: clean-machine packaging test of the frozen Parakeet path; first-run UX
+polish (wizard default to Local + download-in-background).
 
 ## Superseded — original Parakeet/Moonshine spike plan
 

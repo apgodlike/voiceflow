@@ -690,8 +690,8 @@ class UI:
         for _val, _title, _sub in [
             ("openai", "Cloud — OpenAI",
              "Fast & accurate. Needs an API key. ~$0.006/min."),
-            ("local", "Local — Whisper  (free, private)",
-             "Runs on your PC. No API key needed.\nOne-time model download (75 MB – 3 GB)."),
+            ("local", "Local  (free, private)",
+             "Parakeet or Whisper, on your PC. No API key.\nOne-time model download (~330 MB – 1.5 GB)."),
         ]:
             _row = ttk.Frame(p_choose)
             _row.pack(fill="x", pady=4)
