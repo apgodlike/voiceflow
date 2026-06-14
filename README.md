@@ -9,6 +9,8 @@ Hold **Ctrl + Alt**, talk, release — clean text lands at your cursor, in any a
 
 No subscription. No account. No API key. **Your voice never leaves your PC.**
 
+🌐 **[voiceflow.github.io →](https://apgodlike.github.io/voiceflow/)**
+
 ![VoiceFlow demo](VoiceFlow.gif)
 
 ## Why VoiceFlow

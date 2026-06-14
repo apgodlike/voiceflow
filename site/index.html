@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>VoiceFlow — Free, private, offline voice typing for Windows</title>
+<meta name="description" content="Hold a key, talk, release — clean text appears at your cursor in any app. 100% local, no account, no API key. Free and open source. Results in ~1 second." />
+
+<!-- Open Graph / social preview -->
+<meta property="og:type" content="website" />
+<meta property="og:title" content="VoiceFlow — Talk. It types. Anywhere." />
+<meta property="og:description" content="Free, private, offline voice typing for Windows. 100% local, no account, no API key. Text appears in ~1 second, any length." />
+<meta property="og:image" content="https://apgodlike.github.io/voiceflow/demo.gif" />
+<meta property="og:url" content="https://apgodlike.github.io/voiceflow/" />
+<meta name="twitter:card" content="summary_large_image" />
+
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='44' fill='%237c5cff'/></svg>" />
+<style>
+  :root{
+    --bg:#0b0b10; --bg2:#12121b; --card:#16161f; --line:#262635;
+    --fg:#f4f4f8; --muted:#9a9ab0; --brand:#7c5cff; --brand2:#21d4a8; --rec:#ff453a;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    background:var(--bg); color:var(--fg); line-height:1.55;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:inherit;text-decoration:none}
+  .wrap{max-width:1040px;margin:0 auto;padding:0 24px}
+  .btn{
+    display:inline-flex;align-items:center;gap:8px;padding:13px 22px;border-radius:12px;
+    font-weight:600;font-size:15px;transition:.15s;border:1px solid transparent;cursor:pointer;
+  }
+  .btn-primary{background:linear-gradient(135deg,var(--brand),#9b7bff);color:#fff;box-shadow:0 8px 30px rgba(124,92,255,.35)}
+  .btn-primary:hover{transform:translateY(-2px)}
+  .btn-ghost{background:var(--card);border-color:var(--line);color:var(--fg)}
+  .btn-ghost:hover{border-color:var(--brand)}
+
+  /* nav */
+  nav{position:sticky;top:0;z-index:20;background:rgba(11,11,16,.7);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+  nav .wrap{display:flex;align-items:center;justify-content:space-between;height:64px}
+  .logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:18px}
+  .logo .dot{width:12px;height:12px;border-radius:50%;background:var(--brand)}
+  .nav-links{display:flex;align-items:center;gap:22px;font-size:14px;color:var(--muted)}
+  .nav-links a:hover{color:var(--fg)}
+  @media(max-width:640px){.nav-links a:not(.btn){display:none}}
+
+  /* hero */
+  header{position:relative;overflow:hidden;padding:84px 0 40px;text-align:center}
+  header::before{content:"";position:absolute;inset:0;background:
+    radial-gradient(60% 50% at 50% 0%, rgba(124,92,255,.20), transparent 70%),
+    radial-gradient(40% 40% at 80% 10%, rgba(33,212,168,.12), transparent 70%);pointer-events:none}
+  .pill{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--brand2);
+    background:rgba(33,212,168,.08);border:1px solid rgba(33,212,168,.25);padding:6px 14px;border-radius:999px;margin-bottom:22px}
+  h1{font-size:clamp(36px,6vw,62px);line-height:1.05;letter-spacing:-1.5px;font-weight:800}
+  h1 .grad{background:linear-gradient(120deg,var(--brand),var(--brand2));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .sub{font-size:clamp(17px,2.4vw,21px);color:var(--muted);max-width:640px;margin:20px auto 8px}
+  .tags{color:var(--fg);font-weight:600;margin-bottom:28px}
+  .tags span{color:var(--brand2)}
+  .cta{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-bottom:14px}
+  .note{font-size:13px;color:var(--muted)}
+
+  /* demo */
+  .demo{margin:46px auto 0;max-width:760px;border:1px solid var(--line);border-radius:18px;overflow:hidden;
+    box-shadow:0 30px 80px rgba(0,0,0,.5);background:var(--bg2)}
+  .demo img{width:100%;display:block}
+
+  /* stat band */
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);
+    border:1px solid var(--line);border-radius:16px;overflow:hidden;margin:56px 0}
+  .stat{background:var(--bg2);padding:26px 18px;text-align:center}
+  .stat .big{font-size:30px;font-weight:800;background:linear-gradient(120deg,var(--brand),var(--brand2));
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  .stat .lbl{font-size:13px;color:var(--muted);margin-top:4px}
+  @media(max-width:640px){.stats{grid-template-columns:1fr}}
+
+  section{padding:46px 0}
+  h2{font-size:clamp(26px,4vw,36px);letter-spacing:-1px;font-weight:800;text-align:center;margin-bottom:8px}
+  .lead{text-align:center;color:var(--muted);max-width:620px;margin:0 auto 38px}
+
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  @media(max-width:820px){.grid{grid-template-columns:1fr 1fr}}
+  @media(max-width:540px){.grid{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:24px}
+  .card:hover{border-color:var(--brand)}
+  .card .ic{font-size:26px;margin-bottom:12px}
+  .card h3{font-size:17px;margin-bottom:6px}
+  .card p{font-size:14px;color:var(--muted)}
+
+  /* steps */
+  .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;counter-reset:s}
+  @media(max-width:640px){.steps{grid-template-columns:1fr}}
+  .step{background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:24px;position:relative}
+  .step::before{counter-increment:s;content:counter(s);position:absolute;top:-14px;left:20px;
+    width:30px;height:30px;border-radius:50%;background:var(--brand);color:#fff;font-weight:700;
+    display:flex;align-items:center;justify-content:center;font-size:15px}
+  .step h3{margin:6px 0;font-size:17px}
+  .step p{font-size:14px;color:var(--muted)}
+  kbd{background:#222232;border:1px solid var(--line);border-bottom-width:2px;border-radius:6px;padding:2px 8px;font-size:13px;font-family:inherit}
+
+  /* install */
+  .install{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  @media(max-width:820px){.install{grid-template-columns:1fr}}
+  .icard{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px}
+  .icard .h{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+  .icard h3{font-size:16px}
+  .icard .badge{font-size:11px;color:var(--brand2);background:rgba(33,212,168,.08);border:1px solid rgba(33,212,168,.25);padding:3px 9px;border-radius:999px}
+  .code{display:flex;align-items:center;gap:10px;background:#0d0d14;border:1px solid var(--line);border-radius:10px;
+    padding:11px 12px;font-family:ui-monospace,"Cascadia Code",Consolas,monospace;font-size:12.5px;color:#d7d7e6;overflow-x:auto}
+  .code code{white-space:pre;flex:1}
+  .copy{background:#222232;border:1px solid var(--line);color:var(--muted);border-radius:7px;padding:5px 9px;font-size:11px;cursor:pointer;flex-shrink:0}
+  .copy:hover{color:var(--fg);border-color:var(--brand)}
+  .icard p{font-size:13px;color:var(--muted);margin-top:10px}
+
+  footer{border-top:1px solid var(--line);padding:34px 0;text-align:center;color:var(--muted);font-size:14px;margin-top:30px}
+  footer a{color:var(--brand2)}
+  .smallnote{font-size:12px;color:var(--muted);max-width:680px;margin:26px auto 0;text-align:center}
+</style>
+</head>
+<body>
+
+<nav><div class="wrap">
+  <div class="logo"><span class="dot"></span> VoiceFlow</div>
+  <div class="nav-links">
+    <a href="#features">Features</a>
+    <a href="#install">Install</a>
+    <a href="https://github.com/apgodlike/voiceflow" target="_blank" rel="noopener">GitHub</a>
+    <a class="btn btn-primary" href="https://github.com/apgodlike/voiceflow/releases/latest" target="_blank" rel="noopener">Download</a>
+  </div>
+</div></nav>
+
+<header><div class="wrap">
+  <div class="pill">● 100% local &nbsp;·&nbsp; no account &nbsp;·&nbsp; open source</div>
+  <h1>Talk. It types.<br><span class="grad">Anywhere on Windows.</span></h1>
+  <p class="sub">Hold a key, speak, release — clean text appears right at your cursor, in any app.</p>
+  <p class="tags">Free · <span>100% private</span> · offline · no API key</p>
+  <div class="cta">
+    <a class="btn btn-primary" href="https://github.com/apgodlike/voiceflow/releases/latest" target="_blank" rel="noopener">⬇ Download for Windows</a>
+    <a class="btn btn-ghost" href="#install">Install via Scoop / pipx</a>
+  </div>
+  <p class="note">Free forever · MIT licensed · your voice never leaves your PC</p>
+
+  <div class="demo"><img src="demo.gif" alt="VoiceFlow dictation demo" loading="lazy" /></div>
+</div></header>
+
+<div class="wrap">
+  <div class="stats">
+    <div class="stat"><div class="big">~1 second</div><div class="lbl">to text — any length</div></div>
+    <div class="stat"><div class="big">$0</div><div class="lbl">free &amp; open source</div></div>
+    <div class="stat"><div class="big">0</div><div class="lbl">network calls in local mode</div></div>
+  </div>
+</div>
+
+<section id="features"><div class="wrap">
+  <h2>Why VoiceFlow</h2>
+  <p class="lead">A focused, fast, private voice-typing tool — not a subscription, not an account, not your data in someone's cloud.</p>
+  <div class="grid">
+    <div class="card"><div class="ic">🔒</div><h3>100% local &amp; private</h3><p>Local mode runs entirely on your PC. No cloud, no account, zero network calls. Audio is deleted the moment it's typed.</p></div>
+    <div class="card"><div class="ic">⚡</div><h3>Instant — and flat</h3><p>Transcribes while you speak, so text lands in ~1 second on release — the same whether you spoke for 5 seconds or 5 minutes.</p></div>
+    <div class="card"><div class="ic">💸</div><h3>Free forever</h3><p>Open source (MIT). No subscription, no per-word billing, no upsell. Wispr Flow is $14/month; VoiceFlow is $0.</p></div>
+    <div class="card"><div class="ic">🎙️</div><h3>Works in any app</h3><p>Email, chat, code editor, browser, terminal. If you can type in it, you can talk to it — pastes right at your cursor.</p></div>
+    <div class="card"><div class="ic">🧠</div><h3>Your choice of engine</h3><p>Default <strong>Parakeet</strong> (fast, accurate English) or Whisper for other languages — or bring an OpenAI key for the cloud.</p></div>
+    <div class="card"><div class="ic">🧹</div><h3>Clean output</h3><p>Strips “um / uh / you know”, auto-punctuates, fixes your jargon with a custom dictionary, and optional AI polish.</p></div>
+  </div>
+</div></section>
+
+<section><div class="wrap">
+  <h2>How it works</h2>
+  <p class="lead">No setup beyond a one-time model download. Then it's three steps, forever.</p>
+  <div class="steps">
+    <div class="step"><h3>Hold the keys</h3><p>Press and hold <kbd>Ctrl</kbd> + <kbd>Alt</kbd>. A subtle recording indicator appears.</p></div>
+    <div class="step"><h3>Talk</h3><p>Speak naturally — for a sentence or several paragraphs. It's transcribing as you go.</p></div>
+    <div class="step"><h3>Release</h3><p>Let go. Clean text appears at your cursor in about a second. That's it.</p></div>
+  </div>
+</div></section>
+
+<section id="install"><div class="wrap">
+  <h2>Install</h2>
+  <p class="lead">Windows now; macOS &amp; Linux via pipx. Package-manager installs skip the SmartScreen prompt.</p>
+  <div class="install">
+    <div class="icard">
+      <div class="h"><h3>Scoop</h3><span class="badge">Windows · no warning</span></div>
+      <div class="code"><code>scoop bucket add voiceflow https://github.com/apgodlike/voiceflow
+scoop install voiceflow</code><button class="copy" onclick="cp(this)">Copy</button></div>
+      <p>Verified by SHA-256, auto-updates. No “Unknown publisher” prompt.</p>
+    </div>
+    <div class="icard">
+      <div class="h"><h3>pipx</h3><span class="badge">Win · macOS · Linux</span></div>
+      <div class="code"><code>pipx install "voiceflow-dictation[local]"
+voiceflow</code><button class="copy" onclick="cp(this)">Copy</button></div>
+      <p>Runs from source — cross-platform, no installer, no signing prompt.</p>
+    </div>
+    <div class="icard">
+      <div class="h"><h3>Installer</h3><span class="badge">Windows .exe</span></div>
+      <div class="code"><code>Download VoiceFlow-Setup.exe</code><button class="copy" onclick="window.open('https://github.com/apgodlike/voiceflow/releases/latest')">Open</button></div>
+      <p>Grab the latest release. Unsigned for now → “More info → Run anyway”.</p>
+    </div>
+  </div>
+  <p class="smallnote">On first launch a short wizard sets up local (no key) or cloud mode and downloads your chosen model once. Then hold <kbd>Ctrl</kbd>+<kbd>Alt</kbd> and talk.</p>
+</div></section>
+
+<footer><div class="wrap">
+  <p><strong>VoiceFlow</strong> — free, private, offline voice typing.</p>
+  <p style="margin-top:8px">
+    <a href="https://github.com/apgodlike/voiceflow" target="_blank" rel="noopener">GitHub</a> ·
+    <a href="https://github.com/apgodlike/voiceflow/releases/latest" target="_blank" rel="noopener">Releases</a> ·
+    <a href="https://github.com/apgodlike/voiceflow/blob/main/docs/benchmarks.md" target="_blank" rel="noopener">Benchmarks</a> ·
+    MIT licensed
+  </p>
+</div></footer>
+
+<script>
+  function cp(btn){
+    const code = btn.parentElement.querySelector('code').innerText;
+    navigator.clipboard.writeText(code).then(()=>{
+      const t = btn.innerText; btn.innerText = 'Copied!';
+      setTimeout(()=>btn.innerText = t, 1400);
+    });
+  }
+</script>
+</body>
+</html>
