@@ -170,7 +170,7 @@ The first-run wizard sets up local or cloud mode. (For cloud, you can also add `
 
 | Key | Default | Description |
 |-----|---------|-------------|
-| `backend` | `"openai"` | `"local"` (offline Whisper) or `"openai"` (cloud) |
+| `backend` | wizard-set (**Local** recommended) | `"local"` (offline Whisper) or `"openai"` (cloud). The first-run wizard sets this; `"openai"` is only the bare fallback when no wizard has run and the key is unset. |
 | `local_model` | `"distil-medium.en"` | Local Whisper model (see table above) |
 | `openai_api_key` | `""` | API key for cloud mode (fallback: `OPENAI_API_KEY` env var) |
 | `model` | `gpt-4o-mini-transcribe` | Cloud transcription model |
