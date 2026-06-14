@@ -30,7 +30,7 @@ DEFAULTS: dict[str, Any] = {
     "paste_mode": "clipboard",  # "clipboard" (Ctrl+V) or "type" (character-by-character)
     "input_device": None,       # sounddevice input device index; None = system default
     "backend": "openai",        # "openai" | "local" — transcription backend
-    "local_model": "distil-medium.en",  # faster-whisper model; distil/.en = English-only, faster
+    "local_model": "parakeet",  # local engine: "parakeet" (onnx) or a faster-whisper model
 }
 
 
@@ -110,8 +110,9 @@ def validate(cfg: dict[str, Any]) -> list[str]:
             f"'backend' must be \"openai\" or \"local\"; got {backend!r}. Falling back to openai."
         )
 
-    local_model = cfg.get("local_model", "small.en")
+    local_model = cfg.get("local_model", "parakeet")
     _valid_models = (
+        "parakeet",
         "tiny", "tiny.en", "base", "base.en", "small", "small.en",
         "distil-small.en", "medium", "medium.en", "distil-medium.en",
         "large", "distil-large-v3",

@@ -77,6 +77,24 @@ def test_on_start_local_chunk_size_scales_with_model(app, model, expected):
     assert (captured["segment_min_ms"], captured["segment_max_ms"]) == expected
 
 
+@pytest.mark.parametrize("model,engine_mod", [
+    ("parakeet", "voiceflow.transcriber_parakeet"),
+    ("distil-medium.en", "voiceflow.transcriber_local"),
+])
+def test_local_transcribe_dispatches_engine_by_model(app, tmp_path, model, engine_mod):
+    app._cfg["backend"] = "local"
+    app._cfg["local_model"] = model
+    audio = tmp_path / "a.ogg"
+    audio.write_bytes(b"\x00" * 100)
+    import importlib
+    mod = importlib.import_module(engine_mod)
+    with patch.object(mod, "transcribe", return_value="hi") as tr, \
+         patch.object(mod, "is_loaded", return_value=True):
+        out = app._transcribe(audio)
+    assert out == "hi"
+    tr.assert_called_once()
+
+
 def test_on_stop_empty_futures_falls_back_to_full_file(app, tmp_path):
     """If no segments were collected, the whole file is transcribed rather than
     the recording being silently dropped."""

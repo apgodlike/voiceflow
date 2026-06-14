@@ -18,7 +18,16 @@ Living doc of what's done, what's next, and known limits. Updated 2026-06-14.
   remove-downloaded-model from Settings, physical-core thread pinning.
 - Fixes: windowed-build `NoneType.write` download crash; double-paste safety.
 
-## Next — Parakeet / Moonshine spike (the large-accuracy-at-speed question)
+## In review — Parakeet local engine (PR on `feature/local-model`, v0.3.0)
+
+Spike + validation **passed**: Parakeet-TDT-0.6B (onnx-asr/onnxruntime, +42 MB)
+has no encoder floor (30 s → ~2 s, ~2.75 s even on 2 threads), beat
+`distil-medium.en` on real accented audio, stays silent on noise, 760 MB RAM with
+int8. Integrated as the **default English engine** (a model choice in the Local
+backend); Whisper kept for multilingual/noisy. CC-BY-4.0 attribution in `NOTICE`.
+Pending: clean-machine packaging test + first-run UX polish (below).
+
+## Superseded — original Parakeet/Moonshine spike plan
 
 **Why:** any Whisper *large* model has a ~12.5 s encoder floor per call on CPU
 (no GPU) — measured, irreducible. distil-medium.en (~3-4 s) is the practical CPU

@@ -25,6 +25,14 @@ for _pkg in ("faster_whisper", "ctranslate2", "av", "tokenizers", "huggingface_h
     binaries += _b
     hiddenimports += _h
 
+# Parakeet local engine (onnx-asr + onnxruntime) — ~42 MB. Model weights download
+# on first use, like the Whisper models.
+for _pkg in ("onnx_asr", "onnxruntime"):
+    _d, _b, _h = collect_all(_pkg)
+    datas += _d
+    binaries += _b
+    hiddenimports += _h
+
 a = Analysis(
     ["run.py"],
     pathex=[],
