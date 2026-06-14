@@ -30,7 +30,7 @@ DEFAULTS: dict[str, Any] = {
     "paste_mode": "clipboard",  # "clipboard" (Ctrl+V) or "type" (character-by-character)
     "input_device": None,       # sounddevice input device index; None = system default
     "backend": "openai",        # "openai" | "local" — transcription backend
-    "local_model": "small.en",  # faster-whisper model; ".en" = English-only (faster + more accurate)
+    "local_model": "distil-small.en",  # faster-whisper model; distil/.en = English-only, faster
 }
 
 

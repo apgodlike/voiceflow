@@ -317,7 +317,7 @@ class UI:
         backend_var = tk.StringVar(value=self._cfg.get("backend", "openai"))
         key_var = tk.StringVar(value=self._cfg.get("openai_api_key", ""))
         model_var = tk.StringVar(value=self._cfg.get("model", _MODELS[0]))
-        local_model_var = tk.StringVar(value=self._cfg.get("local_model", "small.en"))
+        local_model_var = tk.StringVar(value=self._cfg.get("local_model", "distil-small.en"))
 
         ttk.Label(tab_api, text="Transcription backend").pack(anchor="w")
         _rb = ttk.Frame(tab_api)

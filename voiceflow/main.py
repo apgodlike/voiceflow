@@ -110,7 +110,7 @@ class App:
         backend = self._cfg.get("backend", "openai")
         if backend == "local":
             from voiceflow import transcriber_local
-            model_name = self._cfg.get("local_model", "small.en")
+            model_name = self._cfg.get("local_model", "distil-small.en")
             if not transcriber_local.is_loaded():
                 self._ui.toast(f"Loading local Whisper model '{model_name}'…")
             return transcriber_local.transcribe(audio_path, language=language,
@@ -129,7 +129,7 @@ class App:
 
     def _preload_local_model(self) -> None:
         """Load the configured local model into RAM in the background on startup."""
-        model_name = self._cfg.get("local_model", "small.en")
+        model_name = self._cfg.get("local_model", "distil-small.en")
 
         def _load() -> None:
             try:
@@ -163,7 +163,7 @@ class App:
         self._apply_config_env()
         self._tray.set_backend(new_backend)
         if new_backend == "local":
-            model = self._cfg.get("local_model", "small.en")
+            model = self._cfg.get("local_model", "distil-small.en")
             self._ui.toast(f"Backend → local ({model})")
         else:
             self._ui.toast("Backend → openai")
@@ -234,12 +234,24 @@ class App:
     _MIN_SEGMENT_BYTES = 8_000
 
     def _on_segment(self, index: int, path: Path) -> None:
-        """A segment closed mid-recording — start transcribing it now."""
+        """A segment closed mid-recording — start transcribing it now.
+
+        Only the OpenAI backend uses the per-segment fast-path: those calls are
+        network-bound and parallelize, so transcribing during recording cuts
+        latency. The local Whisper backend does the opposite — its encoder runs
+        a full 30 s window per call, so each short segment re-pays that fixed
+        cost. Local therefore transcribes the whole file once on stop (see
+        ``_finalize_local``); here we only track the segment path for cleanup.
+        """
         try:
             if path.stat().st_size < self._MIN_SEGMENT_BYTES:
                 path.unlink(missing_ok=True)
                 return
         except OSError:
+            return
+        if self._cfg.get("backend") == "local":
+            with self._seg_lock:
+                self._seg_paths[index] = path
             return
         lang = self._cfg.get("language") or None
         fut = self._executor.submit(self._transcribe, path, lang)
@@ -257,6 +269,11 @@ class App:
         """
         self._set_state("transcribing")
         try:
+            if not futures:
+                # No segments collected (e.g. backend toggled mid-recording) —
+                # transcribe the whole file rather than dropping the recording.
+                self._process_job(rid, full_path)
+                return
             try:
                 parts = [
                     (futures[i].result(timeout=SEGMENT_RESULT_TIMEOUT_SEC) or "")
@@ -282,6 +299,16 @@ class App:
             self._cleanup_segments(seg_paths)
             self._set_state("idle")
             self._tray.set_failed_count(len(q.list_pending()))
+
+    def _finalize_local(self, rid: str, full_path: Path,
+                        seg_paths: dict[int, Path]) -> None:
+        """Local backend: one transcription of the whole file (no segment
+        stitching). Avoids the per-segment 30 s encoder tax and yields a single
+        coherent transcript (no false sentence breaks at pauses)."""
+        try:
+            self._process_job(rid, full_path)
+        finally:
+            self._cleanup_segments(seg_paths)
 
     @staticmethod
     def _cleanup_segments(seg_paths: dict[int, Path]) -> None:
@@ -338,8 +365,12 @@ class App:
             seg_paths = dict(self._seg_paths)
         q.enqueue(rid, full)  # durable fallback unit
         self._set_state("transcribing")
+        if self._cfg.get("backend") == "local":
+            target, args = self._finalize_local, (rid, full, seg_paths)
+        else:
+            target, args = self._finalize_job, (rid, full, futures, seg_paths)
         threading.Thread(
-            target=self._finalize_job, args=(rid, full, futures, seg_paths),
+            target=target, args=args,
             daemon=True, name=f"finalize-{rid[:8]}",
         ).start()
 

@@ -16,7 +16,7 @@ def recommended_model() -> str:
     multilingual model in the wizard if they need other languages.
     """
     cores = os.cpu_count() or 2
-    return "medium.en" if cores >= 8 else "small.en"
+    return "distil-medium.en" if cores >= 8 else "distil-small.en"
 
 # ".en" variants are English-only: same size, faster and more accurate than the
 # multilingual model of the same size (no 99-language baggage). Multilingual

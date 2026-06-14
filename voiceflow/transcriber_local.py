@@ -1,11 +1,24 @@
 """Local Whisper transcription via faster-whisper — CPU-serialized for CPU-only systems."""
 import argparse
 import logging
+import os
 import threading
 import time
 from pathlib import Path
 
 logger = logging.getLogger("voiceflow.transcriber_local")
+
+
+def _cpu_threads() -> int:
+    """Threads for CTranslate2 inference — physical cores, not logical.
+
+    CTranslate2's auto setting over-subscribes hyper-threaded CPUs (e.g. uses
+    12 threads on a 6-core/12-thread chip), which measured ~15% slower than
+    pinning to the 6 physical cores. We can't detect hyper-threading from the
+    stdlib, so assume HT on 8+ logical cores and halve; otherwise use all.
+    """
+    logical = os.cpu_count() or 4
+    return max(1, logical // 2) if logical >= 8 else logical
 
 _init_lock = threading.Lock()
 _infer_lock = threading.Lock()
@@ -37,11 +50,14 @@ def _load_model(model_name: str):
                     "faster-whisper not installed — run: pip install faster-whisper"
                 )
             size = _MODEL_SIZES.get(model_name, "?")
+            threads = _cpu_threads()
             logger.info(
-                "Loading local Whisper model '%s' (~%s — downloading on first use)",
-                model_name, size,
+                "Loading local Whisper model '%s' (~%s — downloading on first use, %d threads)",
+                model_name, size, threads,
             )
-            _model_instance = WhisperModel(model_name, device="cpu", compute_type="int8")
+            _model_instance = WhisperModel(
+                model_name, device="cpu", compute_type="int8", cpu_threads=threads
+            )
             _model_name_loaded = model_name
             logger.info("Model '%s' ready.", model_name)
     return _model_instance
