@@ -25,7 +25,8 @@ _MODELS = ["gpt-4o-mini-transcribe", "gpt-4o-transcribe"]
 _SYSTEM_DEFAULT_DEV = "System default"
 _LOCAL_MODEL_SIZES = [
     "tiny", "tiny.en", "base", "base.en", "small", "small.en",
-    "medium", "medium.en", "large",
+    "distil-small.en", "medium", "medium.en", "distil-medium.en",
+    "large", "distil-large-v3",
 ]
 
 # ── animated overlay geometry ──────────────────────────────────────────────────
@@ -342,15 +343,20 @@ class UI:
         _lm_row.pack(anchor="w", pady=(0, 4))
         ttk.Label(_lm_row, text="Model:").pack(side="left")
         _lm_combo = ttk.Combobox(_lm_row, textvariable=local_model_var,
-                                 values=_LOCAL_MODEL_SIZES, state="readonly", width=10)
+                                 values=_LOCAL_MODEL_SIZES, state="readonly", width=18)
         _lm_combo.pack(side="left", padx=(6, 0))
         _lm_size_lbl = ttk.Label(_lm_row, foreground="#666")
         _lm_size_lbl.pack(side="left", padx=8)
         _lm_status_lbl = ttk.Label(_local_sec)
         _lm_status_lbl.pack(anchor="w", pady=(0, 4))
-        _lm_dl_btn = ttk.Button(_local_sec, text="Download model",
+        _lm_btn_row = ttk.Frame(_local_sec)
+        _lm_btn_row.pack(anchor="w")
+        _lm_dl_btn = ttk.Button(_lm_btn_row, text="Download model",
                                 command=lambda: _start_local_dl())
-        _lm_dl_btn.pack(anchor="w")
+        _lm_dl_btn.pack(side="left")
+        _lm_rm_btn = ttk.Button(_lm_btn_row, text="Remove",
+                                command=lambda: _remove_local())
+        _lm_rm_btn.pack(side="left", padx=(8, 0))
         _lm_prog_frame = ttk.Frame(_local_sec)
         _lm_prog = ttk.Progressbar(_lm_prog_frame, mode="determinate", length=300)
         _lm_prog.pack(fill="x")
@@ -367,11 +373,42 @@ class UI:
             if model_manager.is_cached(name):
                 _lm_status_lbl.config(text="✓ Downloaded", foreground="#2a8a2a")
                 _lm_dl_btn.config(text="Re-download")
+                _lm_rm_btn.config(state="normal")
             else:
                 _lm_status_lbl.config(text="Not downloaded yet", foreground="#cc0000")
                 _lm_dl_btn.config(text="Download model")
+                _lm_rm_btn.config(state="disabled")
 
         _lm_combo.bind("<<ComboboxSelected>>", _refresh_lm)
+
+        def _remove_local():
+            name = local_model_var.get()
+            size = None
+            try:
+                from voiceflow import model_manager
+                size = model_manager.MODEL_SIZES.get(name, "")
+            except Exception:
+                pass
+            if not messagebox.askyesno(
+                "Remove model",
+                f"Delete the downloaded '{name}' model ({size}) from disk?\n\n"
+                "You can re-download it anytime.",
+                parent=win,
+            ):
+                return
+            _lm_err_lbl.pack_forget()
+            try:
+                from voiceflow import model_manager, transcriber_local
+                # Drop any in-RAM model first so its files aren't locked (Windows).
+                transcriber_local.reset_model()
+                removed = model_manager.delete(name)
+            except Exception as exc:
+                _lm_err_lbl.config(text=f"Remove failed: {exc}")
+                _lm_err_lbl.pack(anchor="w", pady=(4, 0))
+                return
+            if removed:
+                _lm_status_lbl.config(text="Removed", foreground="#666")
+            _refresh_lm()
 
         def _start_local_dl():
             import threading as _th
@@ -665,7 +702,7 @@ class UI:
         _lm_pick_row.pack(anchor="w", pady=(8, 4))
         _local_model_var = tk.StringVar(value=_recommended)
         _lm_cb = ttk.Combobox(_lm_pick_row, textvariable=_local_model_var,
-                              values=_LOCAL_MODEL_SIZES, state="readonly", width=10)
+                              values=_LOCAL_MODEL_SIZES, state="readonly", width=18)
         _lm_cb.pack(side="left")
         _lm_desc = ttk.Label(_lm_pick_row, foreground="#666")
         _lm_desc.pack(side="left", padx=8)

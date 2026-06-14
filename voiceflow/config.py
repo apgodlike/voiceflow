@@ -113,7 +113,8 @@ def validate(cfg: dict[str, Any]) -> list[str]:
     local_model = cfg.get("local_model", "small.en")
     _valid_models = (
         "tiny", "tiny.en", "base", "base.en", "small", "small.en",
-        "medium", "medium.en", "large",
+        "distil-small.en", "medium", "medium.en", "distil-medium.en",
+        "large", "distil-large-v3",
     )
     if local_model not in _valid_models:
         warnings.append(

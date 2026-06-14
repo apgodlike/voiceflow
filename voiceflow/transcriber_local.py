@@ -16,9 +16,9 @@ _model_name_loaded: str | None = None
 _MODEL_SIZES = {
     "tiny": "75 MB", "tiny.en": "75 MB",
     "base": "145 MB", "base.en": "145 MB",
-    "small": "485 MB", "small.en": "485 MB",
-    "medium": "1.5 GB", "medium.en": "1.5 GB",
-    "large": "3 GB",
+    "small": "485 MB", "small.en": "485 MB", "distil-small.en": "330 MB",
+    "medium": "1.5 GB", "medium.en": "1.5 GB", "distil-medium.en": "790 MB",
+    "large": "3 GB", "distil-large-v3": "1.5 GB",
 }
 
 

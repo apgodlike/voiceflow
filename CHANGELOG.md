@@ -6,7 +6,7 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
-## [0.2.2] - 2026-06-14
+## [0.2.3] - 2026-06-14
 
 ### Added
 - **Local transcription backend** — run Whisper on your own PC via
@@ -16,8 +16,15 @@ All notable changes to this project are documented here. The format is based on
 - English-only (`.en`) model variants (`tiny.en`/`base.en`/`small.en`/`medium.en`):
   same download size, faster and more accurate for English than the multilingual
   model of the same size. Multilingual models remain for other languages.
+- Distil-Whisper models (`distil-small.en`, `distil-medium.en`, `distil-large-v3`):
+  knowledge-distilled, English-only, ~2-4x faster than the full model with
+  near-identical English accuracy. `distil-large-v3` gives large-class accuracy
+  without large's 3-4x-realtime CPU cost (there is no plain `large.en` — large is
+  multilingual only, so the distilled model is the fast English option).
 - Hardware-aware model recommendation in the wizard — pre-selects `medium.en` on
   capable multi-core machines, `small.en` otherwise, based on CPU core count.
+- Remove a downloaded model from Settings to free disk space (re-downloadable
+  anytime).
 
 ### Changed
 - Default local model is `small.en` (safe on any hardware); the wizard upgrades

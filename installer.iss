@@ -6,7 +6,7 @@
 ; Keep MyAppVersion in sync with voiceflow/__init__.py __version__.
 
 #define MyAppName "VoiceFlow"
-#define MyAppVersion "0.2.2"
+#define MyAppVersion "0.2.3"
 #define MyAppPublisher "Praveen"
 #define MyAppExeName "VoiceFlow.exe"
 
