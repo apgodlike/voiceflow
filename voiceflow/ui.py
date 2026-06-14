@@ -522,6 +522,9 @@ class UI:
         code_var = tk.BooleanVar(value=bool(self._cfg.get("code_mode", False)))
         raw_var = tk.BooleanVar(value=bool(self._cfg.get("raw_mode", False)))
         preserve_var = tk.BooleanVar(value=bool(self._cfg.get("preserve_clipboard", False)))
+        ai_var = tk.BooleanVar(value=bool(self._cfg.get("ai_cleanup", False)))
+        ai_provider_var = tk.StringVar(value=self._cfg.get("ai_cleanup_provider", "ollama"))
+        ai_model_var = tk.StringVar(value=self._cfg.get("ai_cleanup_model", ""))
 
         ttk.Label(tab_beh, text="Paste method").pack(anchor="w")
         ttk.Combobox(
@@ -537,6 +540,25 @@ class UI:
         ttk.Checkbutton(tab_beh, text="Code mode (no auto-capitalize, no trailing period)", variable=code_var).pack(anchor="w")
         ttk.Checkbutton(tab_beh, text="Raw mode (verbatim transcript, skip all cleaning)", variable=raw_var).pack(anchor="w")
         ttk.Checkbutton(tab_beh, text="Preserve clipboard (restore prior clipboard after paste)", variable=preserve_var).pack(anchor="w")
+
+        ttk.Separator(tab_beh, orient="horizontal").pack(fill="x", pady=8)
+        ttk.Checkbutton(
+            tab_beh, text="AI cleanup — polish grammar/format with an LLM (slower)",
+            variable=ai_var,
+        ).pack(anchor="w")
+        _ai_row = ttk.Frame(tab_beh)
+        _ai_row.pack(anchor="w", pady=(2, 0))
+        ttk.Label(_ai_row, text="Provider:").pack(side="left")
+        ttk.Combobox(_ai_row, textvariable=ai_provider_var,
+                     values=["ollama", "openai"], state="readonly", width=10).pack(side="left", padx=(4, 12))
+        ttk.Label(_ai_row, text="Model:").pack(side="left")
+        ttk.Entry(_ai_row, textvariable=ai_model_var, width=18).pack(side="left", padx=(4, 0))
+        ttk.Label(
+            tab_beh,
+            text="  ollama — local & private (needs Ollama running); blank model = llama3.2\n"
+                 "  openai — uses your API key; blank model = gpt-4o-mini",
+            foreground="#666666", justify="left",
+        ).pack(anchor="w", pady=(2, 0))
 
         # ── Tab: Text ─────────────────────────────────────────────────────────
         tab_txt = ttk.Frame(nb, padding=12)
@@ -619,6 +641,9 @@ class UI:
                 code_mode=code_var.get(),
                 raw_mode=raw_var.get(),
                 preserve_clipboard=preserve_var.get(),
+                ai_cleanup=ai_var.get(),
+                ai_cleanup_provider=ai_provider_var.get(),
+                ai_cleanup_model=ai_model_var.get().strip(),
                 extra_fillers=extra_list,
                 dictionary=dict_val,
                 notifications_enabled=notif_var.get(),
