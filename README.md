@@ -63,17 +63,19 @@ Then just hold **Ctrl + Alt** and talk. Switch modes anytime from the tray menu.
 
 ## Speed
 
-VoiceFlow transcribes in chunks *while you speak*, so on release only the last few seconds are left to process. **The wait is flat — independent of how long you dictated.** Most local dictation tools transcribe the whole recording *after* you stop, so their wait grows with length.
+VoiceFlow transcribes in chunks *while you speak*, so on release only the last few seconds are left to process. **The wait is flat — under ~1 second, no matter how long you dictated.**
 
-**key-release → text-ready**, same model & CPU ([full benchmark](docs/benchmarks.md)):
+Time from key-release to text on screen, default Parakeet engine ([details](docs/benchmarks.md)):
 
-| You spoke | After-stop tools | **VoiceFlow** |
-|---|---:|---:|
-| 30 s | 2.0 s | **0.9 s** |
-| 60 s | 4.6 s | **0.9 s** |
-| 120 s | 11.4 s | **1.0 s** |
+| You spoke | Time to text |
+|---|---:|
+| 10 s | **0.6 s** |
+| 30 s | **0.9 s** |
+| 60 s | **0.9 s** |
+| 2 min | **1.0 s** |
+| 5 min | **~1.0 s** |
 
-<sub>Parakeet (default English), 6-core CPU. The longer you dictate, the bigger the gap. Exact numbers scale with your hardware; the flat-vs-growing shape holds everywhere. Cloud mode is faster still.</sub>
+<sub>Measured on a 6-core CPU (no GPU). It stays flat because chunks are transcribed during recording — only the final chunk runs on release. Numbers scale with your hardware.</sub>
 
 ## Local models
 

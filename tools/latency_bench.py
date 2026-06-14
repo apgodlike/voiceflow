@@ -87,18 +87,19 @@ def main():
     _time(fn, src[:2 * sr], sr)  # warm
 
     print(f"\nEngine: {args.engine} | CPU cores: {os.cpu_count()}")
-    print(f"{'recording':>10} | {'after-stop (others)':>20} | {'VoiceFlow chunked':>18}")
-    print("-" * 56)
+    print(f"{'recording':>10} | {'VoiceFlow (time to text)':>24} | {'whole-file (ref)':>16}")
+    print("-" * 58)
     for L in TARGET_LENGTHS:
         if L * sr > len(src):
             continue
         clip = src[:L * sr]
-        after = _time(fn, clip, sr)            # whole file on stop
+        whole = _time(fn, clip, sr)            # whole file in one call (reference only)
         chunked = _simulate_chunked(fn, clip, sr)
-        print(f"{L:>8}s  | {after:>18.1f}s | {chunked:>16.1f}s")
+        print(f"{L:>8}s  | {chunked:>22.1f}s | {whole:>14.1f}s")
     if os.path.exists("__bench_tmp.wav"):
         os.remove("__bench_tmp.wav")
-    print("\n(after-stop grows with length; VoiceFlow stays flat — only the final chunk runs on release)")
+    print("\n(VoiceFlow stays flat — only the final chunk runs on release. whole-file column"
+          "\n is a reference for the same model transcribing the entire clip at once.)")
 
 
 if __name__ == "__main__":
