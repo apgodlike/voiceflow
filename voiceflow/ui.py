@@ -424,9 +424,14 @@ class UI:
                 return
             _lm_err_lbl.pack_forget()
             try:
-                from voiceflow import model_manager, transcriber_local
+                from voiceflow import model_manager
                 # Drop any in-RAM model first so its files aren't locked (Windows).
-                transcriber_local.reset_model()
+                if name == "parakeet":
+                    from voiceflow import transcriber_parakeet
+                    transcriber_parakeet.reset_model()
+                else:
+                    from voiceflow import transcriber_local
+                    transcriber_local.reset_model()
                 removed = model_manager.delete(name)
             except Exception as exc:
                 _lm_err_lbl.config(text=f"Remove failed: {exc}")
@@ -669,7 +674,18 @@ class UI:
         win.resizable(False, False)
         win.transient(self.root)
         win.grab_set()
-        win.protocol("WM_DELETE_WINDOW", lambda: None)  # must complete wizard
+
+        def _cancel_wizard() -> None:
+            if messagebox.askyesno(
+                "Quit setup?",
+                "VoiceFlow needs to finish setup before it can run.\n\n"
+                "Quit VoiceFlow now? You can relaunch it anytime to pick up "
+                "setup again.",
+                parent=win,
+            ):
+                self.stop()
+
+        win.protocol("WM_DELETE_WINDOW", _cancel_wizard)
 
         cfg_out: dict = {}
         backend_var = tk.StringVar(value="openai")
@@ -827,8 +843,12 @@ class UI:
                         _lm_plbl.config(text="Loading model into memory...")
                     win.after(0, _switch_to_loading)
 
-                    from voiceflow import transcriber_local
-                    transcriber_local._load_model(name)
+                    if name == "parakeet":
+                        from voiceflow import transcriber_parakeet as engine
+                        engine._load_model()
+                    else:
+                        from voiceflow import transcriber_local as engine
+                        engine._load_model(name)
 
                     def _done():
                         _lm_pb.stop()
